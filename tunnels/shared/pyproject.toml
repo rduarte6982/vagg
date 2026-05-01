@@ -1,0 +1,49 @@
+[project]
+name = "vagg-tunnel-controller"
+version = "0.1.0"
+description = "Stdlib-only unix-socket controller that runs inside vagg-tunnel-* containers."
+readme = "README.md"
+requires-python = ">=3.12"
+license = { text = "Apache-2.0" }
+# No runtime deps — Alpine ``python3`` ships everything we need.
+
+[project.optional-dependencies]
+dev = [
+    "ruff>=0.6,<1.0",
+    "mypy>=1.11,<2.0",
+    "pytest>=8.3,<9.0",
+    "pytest-asyncio>=0.24,<1.0",
+]
+
+# ----- Ruff -----
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = [
+    "E", "W", "F", "I", "B", "C4", "UP", "N", "ASYNC", "PT", "RET", "SIM", "TID",
+]
+ignore = ["B008"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+
+# ----- mypy --strict -----
+[tool.mypy]
+python_version = "3.12"
+strict = true
+warn_unreachable = true
+files = ["tunnel_controller.py", "tests"]
+
+# ----- pytest -----
+[tool.pytest.ini_options]
+minversion = "8.0"
+addopts = ["-ra", "--strict-markers", "--strict-config"]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+pythonpath = ["."]

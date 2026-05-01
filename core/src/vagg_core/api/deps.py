@@ -13,6 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from vagg_core.core.errors import AuthRequiredError
 from vagg_core.core.security import JWTSigner, TokenType
+from vagg_core.services.tunnel_orchestrator import TunnelOrchestratorProtocol
 
 # tokenUrl is what Swagger UI hits to exchange username/password for a token.
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login", auto_error=False)
@@ -45,6 +46,11 @@ class CurrentAdmin:
     """Identity of the authenticated admin (single bootstrap admin in Phase 2)."""
 
     email: str
+
+
+def get_tunnel_orchestrator(request: Request) -> TunnelOrchestratorProtocol:
+    orchestrator: TunnelOrchestratorProtocol = request.app.state.tunnel_orchestrator
+    return orchestrator
 
 
 async def require_admin(

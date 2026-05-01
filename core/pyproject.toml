@@ -27,6 +27,7 @@ dependencies = [
     "python-multipart>=0.0.20,<1.0",
     "httpx>=0.27,<1.0",
     "structlog>=24.4,<26.0",
+    "aiodocker>=0.23,<1.0",
 ]
 
 [project.optional-dependencies]
@@ -83,7 +84,7 @@ warn_redundant_casts = true
 plugins = ["pydantic.mypy"]
 
 [[tool.mypy.overrides]]
-module = ["argon2.*", "freezegun.*"]
+module = ["argon2.*", "freezegun.*", "aiodocker.*"]
 ignore_missing_imports = true
 
 # ----- pytest -----

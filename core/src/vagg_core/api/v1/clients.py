@@ -38,6 +38,9 @@ class ClientCreate(BaseModel):
     real_cidr: str = Field(min_length=9, max_length=43)
     dns_server: str | None = Field(default=None, max_length=45)
     description: str | None = Field(default=None, max_length=512)
+    config_text: str | None = Field(default=None, description=".ovpn ou equivalente")
+    vpn_username: str | None = Field(default=None, max_length=128)
+    vpn_password: str | None = Field(default=None, max_length=256)
     nat_mappings: list[NatMappingPayload] = Field(default_factory=list)
 
 
@@ -48,6 +51,9 @@ class ClientUpdate(BaseModel):
     real_cidr: str | None = Field(default=None, min_length=9, max_length=43)
     dns_server: str | None = Field(default=None, max_length=45)
     description: str | None = Field(default=None, max_length=512)
+    config_text: str | None = None
+    vpn_username: str | None = Field(default=None, max_length=128)
+    vpn_password: str | None = Field(default=None, max_length=256)
 
 
 class NatMappingOut(BaseModel):
@@ -65,6 +71,8 @@ class ClientOut(BaseModel):
     real_cidr: str
     dns_server: str | None
     description: str | None
+    has_config: bool = Field(description="True if config_text is set; raw .ovpn is not exposed")
+    has_credentials: bool = Field(description="True if vpn_username/password are set")
     created_at: datetime
     updated_at: datetime
     tunnel_state: TunnelState
@@ -100,6 +108,8 @@ def _to_out(client: Client) -> ClientOut:
         real_cidr=client.real_cidr,
         dns_server=client.dns_server,
         description=client.description,
+        has_config=bool(client.config_text),
+        has_credentials=bool(client.vpn_username or client.vpn_password),
         created_at=client.created_at,
         updated_at=client.updated_at,
         tunnel_state=state,
@@ -147,6 +157,9 @@ async def create_client(
         real_cidr=body.real_cidr,
         dns_server=body.dns_server,
         description=body.description,
+        config_text=body.config_text,
+        vpn_username=body.vpn_username,
+        vpn_password=body.vpn_password,
     )
     for mapping in body.nat_mappings:
         client.nat_mappings.append(

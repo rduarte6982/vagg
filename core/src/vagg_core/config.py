@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from functools import lru_cache
+from pathlib import Path
 from typing import Literal
 
 from pydantic import EmailStr, Field, SecretStr, field_validator
@@ -64,6 +65,17 @@ class Settings(BaseSettings):
     # ----- License (Phase 1 integration; full enforcement in later phase) -----
     license_key: SecretStr | None = None
     license_server: str = "https://licensing.vagg.io"
+
+    # ----- Tunnels (SPEC §5.2 / Fase 3) -----
+    tunnels_config_dir: Path = Path("/var/lib/vagg/clients")
+    tunnels_sockets_dir: Path = Path("/var/run/vagg")
+    tunnels_image_tag: str = "dev"
+    tunnels_network_name: str = "vagg-net-tenants"
+    tunnels_restart_policy: str = "unless-stopped"
+    tunnels_controller_timeout_s: float = 2.0
+    tunnels_health_enabled: bool = True
+    tunnels_health_interval_s: float = 30.0
+    docker_host: str | None = None  # passa-thru pra DOCKER_HOST
 
 
 @lru_cache(maxsize=1)

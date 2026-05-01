@@ -21,6 +21,12 @@ from vagg_core.core.errors import CoreError
 from vagg_core.core.logging import configure_logging, get_logger
 from vagg_core.core.security import JWTSigner
 from vagg_core.db.session import make_engine, make_session_factory
+from vagg_core.services.tunnel_orchestrator import (
+    TunnelOrchestrator,
+    default_image_map,
+    docker_from_env,
+)
+from vagg_core.workers.tunnel_health import TunnelHealthWorker
 
 log = get_logger(__name__)
 
@@ -40,10 +46,38 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         refresh_ttl_seconds=settings.jwt_refresh_ttl_seconds,
     )
 
+    # Tunnel orchestrator (SPEC §5.2 / Fase 3). The Docker client is created here so
+    # connection failures surface in startup logs, not on the first request.
+    docker_client = docker_from_env()
+    app.state.docker = docker_client
+    app.state.tunnel_orchestrator = TunnelOrchestrator(
+        docker=docker_client,
+        config_dir=settings.tunnels_config_dir,
+        sockets_dir=settings.tunnels_sockets_dir,
+        image_by_protocol=default_image_map(settings.tunnels_image_tag),
+        network_name=settings.tunnels_network_name,
+        restart_policy=settings.tunnels_restart_policy,
+        controller_timeout_s=settings.tunnels_controller_timeout_s,
+    )
+
+    health_worker = TunnelHealthWorker(
+        session_factory=app.state.session_factory,
+        orchestrator=app.state.tunnel_orchestrator,
+        interval_s=settings.tunnels_health_interval_s,
+    )
+    app.state.tunnel_health_worker = health_worker
+    if settings.tunnels_health_enabled:
+        health_worker.start()
+
     log.info("vagg_core.started", version=__version__, environment=settings.environment)
     try:
         yield
     finally:
+        await health_worker.stop()
+        try:
+            await docker_client.close()
+        except Exception as exc:  # noqa: BLE001 — log but don't crash shutdown
+            log.warning("vagg_core.docker_close_failed", error=str(exc))
         await engine.dispose()
         log.info("vagg_core.stopped")
 

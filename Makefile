@@ -3,9 +3,10 @@
 # Makefile/scripts internos; este arquivo orquestra.
 
 .PHONY: help bootstrap lint test clean \
-        bootstrap-core bootstrap-ui bootstrap-license-server \
-        lint-core lint-ui lint-license-server \
-        test-core test-ui test-license-server \
+        bootstrap-core bootstrap-ui bootstrap-license-server bootstrap-tunnels \
+        lint-core lint-ui lint-license-server lint-tunnels \
+        test-core test-ui test-license-server test-tunnels \
+        tunnels-build \
         license-check
 
 # ----- Default -----
@@ -20,7 +21,7 @@ help:
 
 # ----- Bootstrap -----
 
-bootstrap: bootstrap-core bootstrap-ui bootstrap-license-server
+bootstrap: bootstrap-core bootstrap-ui bootstrap-license-server bootstrap-tunnels
 	@echo "[bootstrap] Concluído"
 
 bootstrap-core:
@@ -32,9 +33,12 @@ bootstrap-ui:
 bootstrap-license-server:
 	cd license-server && python -m pip install --upgrade pip && pip install -e ".[dev]"
 
+bootstrap-tunnels:
+	cd tunnels/shared && python -m pip install --upgrade pip && pip install -e ".[dev]"
+
 # ----- Lint -----
 
-lint: lint-core lint-ui lint-license-server
+lint: lint-core lint-ui lint-license-server lint-tunnels
 	@echo "[lint] Concluído"
 
 lint-core:
@@ -46,9 +50,12 @@ lint-ui:
 lint-license-server:
 	cd license-server && ruff check . && ruff format --check . && mypy --strict src
 
+lint-tunnels:
+	cd tunnels/shared && ruff check . && ruff format --check . && mypy --strict tunnel_controller.py tests
+
 # ----- Test -----
 
-test: test-core test-ui test-license-server
+test: test-core test-ui test-license-server test-tunnels
 	@echo "[test] Concluído"
 
 test-core:
@@ -59,6 +66,13 @@ test-ui:
 
 test-license-server:
 	cd license-server && pytest --cov=src --cov-report=term-missing --cov-fail-under=70
+
+test-tunnels:
+	cd tunnels/shared && pytest -q
+
+# Build local de imagem do tunnel-openvpn (sem push). Requer Docker.
+tunnels-build:
+	docker build -f tunnels/openvpn/Dockerfile -t vagg/tunnel-openvpn:dev tunnels/
 
 # ----- License compliance (SPEC §2.5 / §13.5) -----
 

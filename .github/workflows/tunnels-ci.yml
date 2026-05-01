@@ -1,0 +1,91 @@
+name: tunnels-ci
+
+# CI dos componentes que rodam DENTRO dos containers de túnel:
+#   - tunnels/shared: tunnel-controller stdlib-only (Python lint + tests)
+#   - tunnels/openvpn: imagem Docker (build sem push)
+#
+# A partir da Fase 5 outras imagens entram (openconnect, openfortivpn,
+# wireguard, strongswan).
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'tunnels/**'
+      - '.github/workflows/tunnels-ci.yml'
+  pull_request:
+    paths:
+      - 'tunnels/**'
+      - '.github/workflows/tunnels-ci.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tunnels-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  shared-lint-and-test:
+    name: tunnels/shared (lint + test)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+          cache-dependency-path: 'tunnels/shared/pyproject.toml'
+
+      - name: Install dev tools
+        working-directory: tunnels/shared
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+
+      - name: Lint (ruff)
+        working-directory: tunnels/shared
+        run: |
+          ruff check .
+          ruff format --check .
+
+      - name: Type check (mypy --strict)
+        working-directory: tunnels/shared
+        run: mypy --strict tunnel_controller.py tests
+
+      - name: Tests
+        working-directory: tunnels/shared
+        run: pytest -q
+
+  build-openvpn-image:
+    name: tunnels/openvpn (build only)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build vagg-tunnel-openvpn (no push)
+        uses: docker/build-push-action@v6
+        with:
+          context: tunnels
+          file: tunnels/openvpn/Dockerfile
+          push: false
+          tags: vagg/tunnel-openvpn:ci
+          load: true
+
+      - name: Smoke test the image starts
+        run: |
+          # entrypoint exits if /dev/net/tun is missing; in CI we just check
+          # the binary is in place and Python imports work.
+          docker run --rm --entrypoint /bin/sh vagg/tunnel-openvpn:ci -c "
+            test -x /usr/local/bin/tunnel-controller &&
+            test -x /usr/local/bin/entrypoint &&
+            python3 -c 'import asyncio, json; print(\"py-ok\")' &&
+            openvpn --version | head -1
+          "

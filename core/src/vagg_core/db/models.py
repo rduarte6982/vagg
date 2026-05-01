@@ -14,10 +14,12 @@ from sqlalchemy import (
     Boolean,
     CheckConstraint,
     DateTime,
+    Enum,
     ForeignKey,
     Index,
     Integer,
     String,
+    Text,
     UniqueConstraint,
     func,
 )
@@ -65,11 +67,27 @@ class Client(Base):
 
     id: Mapped[str] = mapped_column(String(64), primary_key=True)  # slug, e.g. "petroleo"
     name: Mapped[str] = mapped_column(String(128), nullable=False)
-    vpn_type: Mapped[VpnType] = mapped_column(String(32), nullable=False)
+    vpn_type: Mapped[VpnType] = mapped_column(
+        Enum(
+            VpnType,
+            native_enum=False,
+            length=32,
+            validate_strings=True,
+            values_callable=lambda enum: [e.value for e in enum],
+        ),
+        nullable=False,
+    )
     virtual_cidr: Mapped[str] = mapped_column(String(43), nullable=False)  # IPv4/IPv6 CIDR
     real_cidr: Mapped[str] = mapped_column(String(43), nullable=False)
     dns_server: Mapped[str | None] = mapped_column(String(45), nullable=True)
     description: Mapped[str | None] = mapped_column(String(512), nullable=True)
+
+    # SPEC §5.2 / §10.1: the .ovpn (or equivalent) protocol config + credentials.
+    # Phase 3 stores plaintext to keep the orchestrator simple. A future phase
+    # will encrypt at rest with a master key derived from VAGG_CORE_JWT_SECRET.
+    config_text: Mapped[str | None] = mapped_column(Text(), nullable=True)
+    vpn_username: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    vpn_password: Mapped[str | None] = mapped_column(String(256), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )
@@ -141,7 +159,15 @@ class TunnelStatus(Base):
     )
     container_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
     state: Mapped[TunnelState] = mapped_column(
-        String(16), nullable=False, default=TunnelState.STOPPED
+        Enum(
+            TunnelState,
+            native_enum=False,
+            length=16,
+            validate_strings=True,
+            values_callable=lambda enum: [e.value for e in enum],
+        ),
+        nullable=False,
+        default=TunnelState.STOPPED,
     )
     last_check_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     last_error: Mapped[str | None] = mapped_column(String(2048), nullable=True)
@@ -204,7 +230,15 @@ class Policy(Base):
         String(64), ForeignKey("clients.id", ondelete="CASCADE"), nullable=False
     )
     scope_kind: Mapped[PolicyScopeKind] = mapped_column(
-        String(16), nullable=False, default=PolicyScopeKind.FULL
+        Enum(
+            PolicyScopeKind,
+            native_enum=False,
+            length=16,
+            validate_strings=True,
+            values_callable=lambda enum: [e.value for e in enum],
+        ),
+        nullable=False,
+        default=PolicyScopeKind.FULL,
     )
     scope_value: Mapped[str | None] = mapped_column(String(64), nullable=True)
     expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
