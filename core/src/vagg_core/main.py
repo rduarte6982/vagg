@@ -21,6 +21,8 @@ from vagg_core.core.errors import CoreError
 from vagg_core.core.logging import configure_logging, get_logger
 from vagg_core.core.security import JWTSigner
 from vagg_core.db.session import make_engine, make_session_factory
+from vagg_core.services.network_applier import NetworkApplier, shell_runner
+from vagg_core.services.network_manager import NetworkManager
 from vagg_core.services.tunnel_orchestrator import (
     TunnelOrchestrator,
     default_image_map,
@@ -46,6 +48,21 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         refresh_ttl_seconds=settings.jwt_refresh_ttl_seconds,
     )
 
+    # Network manager (SPEC §4.2 / §4.3). Disabled by default; production
+    # installer sets ``network_apply_enabled=true`` to push iptables to the host.
+    network_manager: NetworkManager | None = None
+    if settings.network_apply_enabled:
+        applier = NetworkApplier(
+            runner=shell_runner,
+            rt_tables_path=settings.rt_tables_path,
+        )
+        network_manager = NetworkManager(
+            session_factory=app.state.session_factory,
+            applier=applier,
+            virtual_range=settings.virtual_range,
+        )
+    app.state.network_manager = network_manager
+
     # Tunnel orchestrator (SPEC §5.2 / Fase 3). The Docker client is created here so
     # connection failures surface in startup logs, not on the first request.
     docker_client = docker_from_env()
@@ -58,6 +75,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         network_name=settings.tunnels_network_name,
         restart_policy=settings.tunnels_restart_policy,
         controller_timeout_s=settings.tunnels_controller_timeout_s,
+        network_manager=network_manager,
     )
 
     health_worker = TunnelHealthWorker(

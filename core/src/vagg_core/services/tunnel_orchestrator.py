@@ -30,6 +30,8 @@ from aiodocker.exceptions import DockerError
 from vagg_core.core.errors import ConflictError, CoreError, NotFoundError
 from vagg_core.core.logging import get_logger
 from vagg_core.db.models import TunnelState, VpnType
+from vagg_core.services.network_manager import NetworkManagerProtocol
+from vagg_core.services.network_plan import iface_name
 
 log = get_logger(__name__)
 
@@ -97,17 +99,22 @@ class TunnelOrchestrator:
         config_dir: Path,
         sockets_dir: Path,
         image_by_protocol: dict[VpnType, str],
-        network_name: str = "vagg-net-tenants",
+        network_name: str = "host",
         restart_policy: str = "unless-stopped",
         controller_timeout_s: float = 2.0,
+        network_manager: NetworkManagerProtocol | None = None,
     ) -> None:
         self._docker = docker
         self._config_dir = config_dir
         self._sockets_dir = sockets_dir
         self._image_by_protocol = image_by_protocol
+        # SPEC §3.4 + §4.3: tunnel containers must share the host network namespace
+        # so the openvpn process creates ``tun-<hash>`` directly on the host, where
+        # the host's iptables can route packets to it.
         self._network = network_name
         self._restart = restart_policy
         self._controller_timeout = controller_timeout_s
+        self._network_manager = network_manager
 
     # ----- Helpers -----
 
@@ -150,6 +157,9 @@ class TunnelOrchestrator:
             pwd_file.write_text(password, encoding="utf-8")
             with contextlib.suppress(NotImplementedError, OSError):
                 pwd_file.chmod(0o600)
+        # Deterministic iface name so the host's iptables / ip-route rules can
+        # reference it without coordinating through a shared file (SPEC §4.3).
+        env["TUNNEL_DEV"] = iface_name(client_id)
 
         return cfg_dir, env
 
@@ -238,6 +248,17 @@ class TunnelOrchestrator:
             ) from exc
 
         log.info("tunnel.connect.ok", client_id=client_id, container_id=container.id)
+        # Rebuild the host's NAT / routing state to include this client (SPEC §4.2).
+        # Failure here doesn't roll back the container — the health worker re-tries.
+        if self._network_manager is not None:
+            try:
+                await self._network_manager.rebuild()
+            except CoreError as exc:
+                log.warning(
+                    "tunnel.connect.network_rebuild_failed",
+                    client_id=client_id,
+                    error=str(exc.detail),
+                )
         return str(container.id)
 
     async def disconnect(self, client_id: str) -> None:
@@ -261,6 +282,16 @@ class TunnelOrchestrator:
             if exc.status != 404:
                 raise TunnelOrchestrationError(str(exc.message)) from exc
         log.info("tunnel.disconnect.ok", client_id=client_id)
+        # Rebuild network so this client's rules are dropped from the host.
+        if self._network_manager is not None:
+            try:
+                await self._network_manager.rebuild()
+            except CoreError as exc:
+                log.warning(
+                    "tunnel.disconnect.network_rebuild_failed",
+                    client_id=client_id,
+                    error=str(exc.detail),
+                )
 
     async def status(self, client_id: str) -> TunnelStatusReport:
         try:

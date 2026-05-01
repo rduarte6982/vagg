@@ -70,12 +70,19 @@ class Settings(BaseSettings):
     tunnels_config_dir: Path = Path("/var/lib/vagg/clients")
     tunnels_sockets_dir: Path = Path("/var/run/vagg")
     tunnels_image_tag: str = "dev"
-    tunnels_network_name: str = "vagg-net-tenants"
+    # ``host`` shares the host's network namespace so tun-X is visible to host
+    # iptables (SPEC §3.4 + §4.3). Override only for testing.
+    tunnels_network_name: str = "host"
     tunnels_restart_policy: str = "unless-stopped"
     tunnels_controller_timeout_s: float = 2.0
     tunnels_health_enabled: bool = True
     tunnels_health_interval_s: float = 30.0
     docker_host: str | None = None  # passa-thru pra DOCKER_HOST
+
+    # ----- Networking apply (SPEC §4.2 / §4.3 / Fase 4) -----
+    # Disabled by default in dev/test; the installer sets it to true.
+    network_apply_enabled: bool = False
+    rt_tables_path: Path = Path("/etc/iproute2/rt_tables")
 
 
 @lru_cache(maxsize=1)

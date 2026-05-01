@@ -42,6 +42,13 @@ trap 'kill -TERM "$controller_pid" 2>/dev/null || true; exit 0' TERM INT
 
 # OpenVPN runs as PID 1's child via exec. Management socket is unix so the
 # controller can talk to it without exposing TCP.
+dev_args=""
+if [ -n "${TUNNEL_DEV:-}" ]; then
+    # Override the .ovpn's --dev so the host's iptables / ip-route can address
+    # the tun interface by a deterministic name (SPEC §4.3).
+    dev_args="--dev $TUNNEL_DEV"
+fi
+
 exec openvpn \
     --config "$TUNNEL_CONFIG_PATH" \
     --management "$TUNNEL_OPENVPN_MGMT_SOCKET" unix \
@@ -49,4 +56,5 @@ exec openvpn \
     --management-hold \
     --auth-nocache \
     --verb 3 \
+    $dev_args \
     $auth_args
