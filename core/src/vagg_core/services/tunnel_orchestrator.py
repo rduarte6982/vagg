@@ -400,7 +400,13 @@ class TunnelOrchestrator:
 
 def default_image_map(tag: str = "dev") -> dict[VpnType, str]:
     """Return the canonical ``vagg/tunnel-<protocol>:<tag>`` mapping for known protocols."""
-    return {VpnType.OPENVPN: f"vagg/tunnel-openvpn:{tag}"}
+    return {
+        VpnType.OPENVPN: f"vagg/tunnel-openvpn:{tag}",
+        VpnType.OPENCONNECT: f"vagg/tunnel-openconnect:{tag}",
+        VpnType.OPENFORTIVPN: f"vagg/tunnel-openfortivpn:{tag}",
+        VpnType.WIREGUARD: f"vagg/tunnel-wireguard:{tag}",
+        VpnType.STRONGSWAN: f"vagg/tunnel-strongswan:{tag}",
+    }
 
 
 def docker_from_env() -> aiodocker.Docker:

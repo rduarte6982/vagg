@@ -2,10 +2,9 @@ name: tunnels-ci
 
 # CI dos componentes que rodam DENTRO dos containers de túnel:
 #   - tunnels/shared: tunnel-controller stdlib-only (Python lint + tests)
-#   - tunnels/openvpn: imagem Docker (build sem push)
-#
-# A partir da Fase 5 outras imagens entram (openconnect, openfortivpn,
-# wireguard, strongswan).
+#   - tunnels/<proto>: imagens Docker (build sem push) — matrix com os 5 protocolos
+#     suportados a partir da Fase 5: openvpn, openconnect, openfortivpn,
+#     wireguard, strongswan.
 
 on:
   push:
@@ -60,32 +59,49 @@ jobs:
         working-directory: tunnels/shared
         run: pytest -q
 
-  build-openvpn-image:
-    name: tunnels/openvpn (build only)
+  build-images:
+    name: tunnels/${{ matrix.protocol }} (build)
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    timeout-minutes: 15
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - protocol: openvpn
+            smoke: openvpn --version | head -1
+          - protocol: openconnect
+            smoke: openconnect --version | head -1
+          - protocol: openfortivpn
+            smoke: openfortivpn --version
+          - protocol: wireguard
+            smoke: wg --version
+          - protocol: strongswan
+            smoke: swanctl --version
 
     steps:
       - uses: actions/checkout@v4
 
       - uses: docker/setup-buildx-action@v3
 
-      - name: Build vagg-tunnel-openvpn (no push)
+      - name: Build vagg-tunnel-${{ matrix.protocol }} (no push)
         uses: docker/build-push-action@v6
         with:
           context: tunnels
-          file: tunnels/openvpn/Dockerfile
+          file: tunnels/${{ matrix.protocol }}/Dockerfile
           push: false
-          tags: vagg/tunnel-openvpn:ci
+          tags: vagg/tunnel-${{ matrix.protocol }}:ci
           load: true
 
       - name: Smoke test the image starts
         run: |
-          # entrypoint exits if /dev/net/tun is missing; in CI we just check
-          # the binary is in place and Python imports work.
-          docker run --rm --entrypoint /bin/sh vagg/tunnel-openvpn:ci -c "
+          # Confirm the controller + protocol binary are in place and python
+          # can import asyncio. Real protocol-level testing requires lab VPN
+          # servers and is done manually.
+          docker run --rm --entrypoint /bin/sh \
+              vagg/tunnel-${{ matrix.protocol }}:ci -c "
             test -x /usr/local/bin/tunnel-controller &&
             test -x /usr/local/bin/entrypoint &&
             python3 -c 'import asyncio, json; print(\"py-ok\")' &&
-            openvpn --version | head -1
+            ${{ matrix.smoke }}
           "
