@@ -9,9 +9,9 @@ from pydantic import BaseModel, Field
 
 from vagg_license.api.deps import get_jwt_signer, get_license_store
 from vagg_license.core.errors import (
-    FingerprintMismatch,
-    LicenseInactive,
-    LicenseNotFound,
+    FingerprintMismatchError,
+    LicenseInactiveError,
+    LicenseNotFoundError,
 )
 from vagg_license.db.models import LicenseStatus
 from vagg_license.services.jwt_signer import JWTSigner, hash_fingerprint
@@ -40,10 +40,10 @@ async def activate(
 ) -> ActivateResponse:
     license_obj = await store.get_by_license_key(body.license_key)
     if license_obj is None:
-        raise LicenseNotFound("license_key não encontrada")
+        raise LicenseNotFoundError("license_key não encontrada")
 
     if license_obj.status == LicenseStatus.CANCELED:
-        raise LicenseInactive(
+        raise LicenseInactiveError(
             "Assinatura cancelada. Pagamento necessário para reativação.",
             context={"status": license_obj.status.value},
         )
@@ -59,7 +59,7 @@ async def activate(
     else:
         # Subsequent activation — must match (anti-tampering, SPEC §6.6).
         if license_obj.instance_id != body.instance_id or license_obj.fingerprint_hash != fp_hash:
-            raise FingerprintMismatch(
+            raise FingerprintMismatchError(
                 "instance_id ou fingerprint não corresponde ao registrado. "
                 "Migrações de hardware exigem reativação manual via suporte.",
                 context={"license_key": body.license_key},

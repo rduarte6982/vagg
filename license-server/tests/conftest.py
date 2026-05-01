@@ -94,7 +94,9 @@ def database_url() -> Iterator[str]:
     try:
         from testcontainers.postgres import PostgresContainer
     except ImportError:
-        pytest.skip("Postgres não disponível: defina VAGG_LICENSE_TEST_DATABASE_URL ou instale Docker")
+        pytest.skip(
+            "Postgres não disponível: defina VAGG_LICENSE_TEST_DATABASE_URL ou instale Docker"
+        )
 
     try:
         with PostgresContainer("postgres:16-alpine") as pg:

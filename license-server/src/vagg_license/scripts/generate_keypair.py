@@ -47,7 +47,9 @@ def _emit_pubkey_module(public_pem: bytes) -> str:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Generate Ed25519 keypair for license JWT signing.")
+    parser = argparse.ArgumentParser(
+        description="Generate Ed25519 keypair for license JWT signing.",
+    )
     parser.add_argument(
         "--out-dir",
         type=Path,

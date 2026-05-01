@@ -12,7 +12,7 @@ from typing import Any
 
 import stripe
 
-from vagg_license.core.errors import StripeIntegrationError, WebhookSignatureInvalid
+from vagg_license.core.errors import StripeIntegrationError, WebhookSignatureInvalidError
 from vagg_license.db.models import LicenseStatus, Plan
 
 
@@ -55,7 +55,7 @@ class StripeClient:
                 tolerance=self._webhook_tolerance,
             )
         except (stripe.SignatureVerificationError, ValueError) as exc:
-            raise WebhookSignatureInvalid(detail=str(exc)) from exc
+            raise WebhookSignatureInvalidError(detail=str(exc)) from exc
 
     # ----- Subscription lookup -----
 

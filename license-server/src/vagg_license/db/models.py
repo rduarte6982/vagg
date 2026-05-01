@@ -15,7 +15,7 @@ class Base(DeclarativeBase):
     pass
 
 
-class LicenseStatus(str, enum.Enum):
+class LicenseStatus(enum.StrEnum):
     """Mirrors SPEC §6.7. Values are lowercase to match Stripe convention."""
 
     ACTIVE = "active"
@@ -24,7 +24,7 @@ class LicenseStatus(str, enum.Enum):
     PAUSED = "paused"
 
 
-class Plan(str, enum.Enum):
+class Plan(enum.StrEnum):
     """Plan slugs (SPEC §6.1)."""
 
     STARTER = "starter"

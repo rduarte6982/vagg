@@ -9,9 +9,9 @@ from pydantic import BaseModel, Field
 
 from vagg_license.api.deps import get_jwt_signer, get_license_store
 from vagg_license.core.errors import (
-    FingerprintMismatch,
-    LicenseInactive,
-    LicenseNotFound,
+    FingerprintMismatchError,
+    LicenseInactiveError,
+    LicenseNotFoundError,
 )
 from vagg_license.db.models import LicenseStatus
 from vagg_license.services.jwt_signer import JWTSigner, hash_fingerprint
@@ -39,25 +39,25 @@ async def refresh(
 ) -> RefreshResponse:
     license_obj = await store.get_by_license_key(body.license_key)
     if license_obj is None:
-        raise LicenseNotFound("license_key não encontrada")
+        raise LicenseNotFoundError("license_key não encontrada")
 
     # SPEC §6.3 / §6.7: canceled → 402 (forces grace-period behavior on aggregator);
     # past_due / paused → JWT issued with warning so aggregator enters degraded read-only mode.
     if license_obj.status == LicenseStatus.CANCELED:
-        raise LicenseInactive(
+        raise LicenseInactiveError(
             "Assinatura cancelada. Pagamento necessário para reativação.",
             context={"status": license_obj.status.value},
         )
 
     if license_obj.instance_id is None or license_obj.fingerprint_hash is None:
-        raise LicenseNotFound(
+        raise LicenseNotFoundError(
             "license ainda não foi ativada. Use /activate primeiro.",
             context={"license_key": body.license_key},
         )
 
     fp_hash = hash_fingerprint(body.fingerprint)
     if license_obj.instance_id != body.instance_id or license_obj.fingerprint_hash != fp_hash:
-        raise FingerprintMismatch(
+        raise FingerprintMismatchError(
             "instance_id ou fingerprint não corresponde ao registrado.",
             context={"license_key": body.license_key},
         )

@@ -78,6 +78,11 @@ ignore = [
 "tests/**" = ["S105", "S106", "S311"]  # hardcoded test secrets, weak random in tests
 "src/vagg_license/scripts/**" = ["T201"]  # CLI scripts may print
 
+[tool.ruff.lint.isort]
+known-first-party = ["vagg_license", "tests"]
+combine-as-imports = true
+force-sort-within-sections = false
+
 [tool.ruff.format]
 quote-style = "double"
 indent-style = "space"

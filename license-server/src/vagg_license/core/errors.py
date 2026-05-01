@@ -24,24 +24,24 @@ class LicenseServerError(HTTPException):
         )
 
 
-class LicenseNotFound(LicenseServerError):
+class LicenseNotFoundError(LicenseServerError):
     code = "LICENSE_NOT_FOUND"
     default_status = status.HTTP_404_NOT_FOUND
 
 
-class FingerprintMismatch(LicenseServerError):
+class FingerprintMismatchError(LicenseServerError):
     code = "FINGERPRINT_MISMATCH"
     default_status = status.HTTP_409_CONFLICT
 
 
-class LicenseInactive(LicenseServerError):
+class LicenseInactiveError(LicenseServerError):
     """Raised when a refresh request hits a canceled subscription (SPEC §6.4)."""
 
     code = "LICENSE_INACTIVE"
     default_status = status.HTTP_402_PAYMENT_REQUIRED
 
 
-class WebhookSignatureInvalid(LicenseServerError):
+class WebhookSignatureInvalidError(LicenseServerError):
     code = "WEBHOOK_SIGNATURE_INVALID"
     default_status = status.HTTP_400_BAD_REQUEST
 
