@@ -52,7 +52,9 @@ class OpenVPNManager:
         self._socket = mgmt_socket
 
     async def _connect(self) -> tuple[asyncio.StreamReader, asyncio.StreamWriter]:
-        reader, writer = await asyncio.open_unix_connection(self._socket)  # type: ignore[attr-defined]
+        reader, writer = await asyncio.open_unix_connection(  # type: ignore[attr-defined,unused-ignore]
+            self._socket
+        )
         # Eat the welcome banner; it's a single line ending with \r\n.
         with contextlib.suppress(TimeoutError):
             await asyncio.wait_for(reader.readline(), timeout=2.0)
@@ -187,7 +189,7 @@ async def _serve(controller: TunnelController, control_socket: str) -> asyncio.A
             with contextlib.suppress(OSError):
                 await writer.wait_closed()
 
-    server: asyncio.AbstractServer = await asyncio.start_unix_server(  # type: ignore[attr-defined]
+    server: asyncio.AbstractServer = await asyncio.start_unix_server(  # type: ignore[attr-defined,unused-ignore]
         _client_handler, path=str(socket_path)
     )
     socket_path.chmod(0o660)  # noqa: ASYNC240 — startup only

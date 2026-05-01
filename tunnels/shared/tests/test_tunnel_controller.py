@@ -128,7 +128,7 @@ class TestServer:
         ctl = TunnelController(mgr, started_at=time.time())
         server = await _serve(ctl, socket_path)
         try:
-            reader, writer = await asyncio.open_unix_connection(socket_path)  # type: ignore[attr-defined]
+            reader, writer = await asyncio.open_unix_connection(socket_path)  # type: ignore[attr-defined,unused-ignore]
             writer.write(b'{"cmd":"status"}\n')
             await writer.drain()
             line = await asyncio.wait_for(reader.readline(), timeout=2.0)
@@ -146,7 +146,7 @@ class TestServer:
         ctl = TunnelController(FakeManager(), started_at=time.time())
         server = await _serve(ctl, socket_path)
         try:
-            reader, writer = await asyncio.open_unix_connection(socket_path)  # type: ignore[attr-defined]
+            reader, writer = await asyncio.open_unix_connection(socket_path)  # type: ignore[attr-defined,unused-ignore]
             writer.write(b"not-json\n")
             await writer.drain()
             line = await asyncio.wait_for(reader.readline(), timeout=2.0)
