@@ -116,6 +116,10 @@ markers = [
 [tool.coverage.run]
 source = ["src/vagg_license"]
 branch = true
+omit = [
+    # CLI utility — exercised manually by operators, not in pytest
+    "src/vagg_license/scripts/*",
+]
 
 [tool.coverage.report]
 show_missing = true

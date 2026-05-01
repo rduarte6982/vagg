@@ -22,8 +22,8 @@ router = APIRouter(prefix="/api/v1", tags=["license"])
 
 class ActivateRequest(BaseModel):
     license_key: str = Field(min_length=8, max_length=32)
-    instance_id: str = Field(min_length=8, max_length=128)
-    fingerprint: str = Field(min_length=8, max_length=512)
+    instance_id: str = Field(min_length=4, max_length=128)
+    fingerprint: str = Field(min_length=4, max_length=512)
 
 
 class ActivateResponse(BaseModel):
