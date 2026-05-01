@@ -1,0 +1,45 @@
+# Render deploy manifest. Apply via: render blueprint apply
+# Alternativas suportadas: Cloud Run (Dockerfile), Fly.io (fly launch). Documentado no README.
+
+services:
+  - type: web
+    name: vagg-license-server
+    runtime: docker
+    plan: starter
+    region: oregon
+    autoDeploy: true
+    branch: main
+    rootDir: license-server
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /health
+    envVars:
+      - key: VAGG_LICENSE_ENVIRONMENT
+        value: production
+      - key: VAGG_LICENSE_LOG_LEVEL
+        value: INFO
+      - key: VAGG_LICENSE_DATABASE_URL
+        fromDatabase:
+          name: vagg-license-db
+          property: connectionString
+      - key: VAGG_LICENSE_JWT_PRIVATE_KEY_PEM
+        sync: false  # Set manually in Render dashboard (secret)
+      - key: VAGG_LICENSE_JWT_PUBLIC_KEY_PEM
+        sync: false
+      - key: VAGG_LICENSE_STRIPE_API_KEY
+        sync: false
+      - key: VAGG_LICENSE_STRIPE_WEBHOOK_SECRET
+        sync: false
+      - key: VAGG_LICENSE_STRIPE_PRICE_ID_STARTER
+        sync: false
+      - key: VAGG_LICENSE_STRIPE_PRICE_ID_PROFESSIONAL
+        sync: false
+      - key: VAGG_LICENSE_STRIPE_PRICE_ID_ENTERPRISE
+        sync: false
+
+databases:
+  - name: vagg-license-db
+    plan: starter
+    databaseName: vagg_license
+    user: vagg
+    region: oregon
+    postgresMajorVersion: "16"

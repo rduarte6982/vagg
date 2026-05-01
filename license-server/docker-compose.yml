@@ -1,0 +1,34 @@
+# Local development stack: Postgres + license server.
+# Não usar em produção — sem TLS, secrets em plaintext.
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: vagg
+      POSTGRES_PASSWORD: vagg
+      POSTGRES_DB: vagg_license
+    ports:
+      - "5432:5432"
+    volumes:
+      - vagg_pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U vagg -d vagg_license"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  license-server:
+    build: .
+    depends_on:
+      postgres:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      VAGG_LICENSE_DATABASE_URL: postgresql+asyncpg://vagg:vagg@postgres:5432/vagg_license
+    ports:
+      - "8080:8080"
+
+volumes:
+  vagg_pg_data:
