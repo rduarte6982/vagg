@@ -24,7 +24,7 @@ bootstrap: bootstrap-core bootstrap-ui bootstrap-license-server
 	@echo "[bootstrap] Concluído"
 
 bootstrap-core:
-	@echo "[bootstrap-core] (placeholder — implementado em Fase 2)"
+	cd core && python -m pip install --upgrade pip && pip install -e ".[dev]"
 
 bootstrap-ui:
 	@echo "[bootstrap-ui] (placeholder — implementado em Fase 7)"
@@ -38,7 +38,7 @@ lint: lint-core lint-ui lint-license-server
 	@echo "[lint] Concluído"
 
 lint-core:
-	@echo "[lint-core] (placeholder — ruff check + mypy --strict em Fase 2)"
+	cd core && ruff check . && ruff format --check . && mypy --strict src
 
 lint-ui:
 	@echo "[lint-ui] (placeholder — eslint + prettier --check em Fase 7)"
@@ -52,7 +52,7 @@ test: test-core test-ui test-license-server
 	@echo "[test] Concluído"
 
 test-core:
-	@echo "[test-core] (placeholder — pytest em Fase 2)"
+	cd core && pytest --cov=src --cov-report=term-missing --cov-fail-under=70
 
 test-ui:
 	@echo "[test-ui] (placeholder — vitest em Fase 7)"
@@ -62,13 +62,19 @@ test-license-server:
 
 # ----- License compliance (SPEC §2.5 / §13.5) -----
 
-license-check: license-check-license-server
+license-check: license-check-license-server license-check-core
 	@echo "[license-check] Concluído"
 
 license-check-license-server:
 	@echo "[license-check] vagg-license-server"
 	@command -v pip-licenses >/dev/null 2>&1 || pip install pip-licenses
 	@cd license-server && pip-licenses --format=plain --with-urls \
+		--fail-on='AGPL;AGPL-3.0;AGPL-3.0-only;AGPL-3.0-or-later;GPL-3.0;GPL-3.0-only;GPL-3.0-or-later;SSPL;BUSL;BSL;FCL'
+
+license-check-core:
+	@echo "[license-check] vagg-core"
+	@command -v pip-licenses >/dev/null 2>&1 || pip install pip-licenses
+	@cd core && pip-licenses --format=plain --with-urls \
 		--fail-on='AGPL;AGPL-3.0;AGPL-3.0-only;AGPL-3.0-or-later;GPL-3.0;GPL-3.0-only;GPL-3.0-or-later;SSPL;BUSL;BSL;FCL'
 
 # ----- Clean -----

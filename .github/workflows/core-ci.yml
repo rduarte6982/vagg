@@ -1,7 +1,6 @@
 name: core-ci
 
 # CI dos componentes Python (vagg-core e vagg-license-server).
-# license-server: Fase 1 (esta PR). core: stub até Fase 2.
 
 on:
   push:
@@ -50,11 +49,9 @@ jobs:
       VAGG_LICENSE_TEST_DATABASE_URL: postgresql+asyncpg://vagg:vagg@localhost:5432/vagg_license_test
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Setup Python 3.12
-        uses: actions/setup-python@v5
+      - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
           cache: 'pip'
@@ -76,7 +73,7 @@ jobs:
         working-directory: license-server
         run: mypy --strict src
 
-      - name: Migrations apply cleanly (alembic upgrade head)
+      - name: Migrations apply cleanly
         working-directory: license-server
         env:
           VAGG_LICENSE_DATABASE_URL: ${{ env.VAGG_LICENSE_TEST_DATABASE_URL }}
@@ -98,17 +95,50 @@ jobs:
             --fail-on='AGPL;AGPL-3.0;AGPL-3.0-only;AGPL-3.0-or-later;GPL-3.0;GPL-3.0-only;GPL-3.0-or-later;SSPL;BUSL;BSL;FCL'
 
   core:
-    name: core (stub até Fase 2)
+    name: vagg-core (lint + test)
     runs-on: ubuntu-24.04
-    timeout-minutes: 5
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+    timeout-minutes: 15
 
-      - name: Verifica presença de pyproject.toml
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+          cache-dependency-path: 'core/pyproject.toml'
+
+      - name: Install
+        working-directory: core
         run: |
-          if [ -f core/pyproject.toml ]; then
-            echo "::notice::core/pyproject.toml presente — migrar este job para o template real"
-            exit 1
-          fi
-          echo "::notice::core ainda é stub (Fase 2)"
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+
+      - name: Lint (ruff)
+        working-directory: core
+        run: |
+          ruff check .
+          ruff format --check .
+
+      - name: Type check (mypy --strict)
+        working-directory: core
+        run: mypy --strict src
+
+      - name: Migrations apply cleanly (SQLite tempfile)
+        working-directory: core
+        env:
+          VAGG_CORE_DATABASE_URL: sqlite+aiosqlite:////tmp/vagg-core-ci.db
+          VAGG_CORE_ADMIN_PASSWORD_HASH: "$argon2id$v=19$m=65536,t=3,p=4$placeholderhash"
+          VAGG_CORE_JWT_SECRET: "placeholder-jwt-secret-for-migrations"
+        run: alembic upgrade head
+
+      - name: Tests
+        working-directory: core
+        run: pytest --cov=src --cov-report=term-missing --cov-report=xml --cov-fail-under=70
+
+      - name: License compliance (pip-licenses)
+        working-directory: core
+        run: |
+          pip install pip-licenses
+          pip-licenses --format=plain --with-urls \
+            --fail-on='AGPL;AGPL-3.0;AGPL-3.0-only;AGPL-3.0-or-later;GPL-3.0;GPL-3.0-only;GPL-3.0-or-later;SSPL;BUSL;BSL;FCL'

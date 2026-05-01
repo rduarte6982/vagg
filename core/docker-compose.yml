@@ -1,0 +1,18 @@
+# Stack local de dev: vagg-core com SQLite em volume.
+# NÃO usar em produção — em prod o core roda direto no host (SPEC §3.4),
+# fora do Docker, para poder manipular iptables/ip rule.
+
+services:
+  core:
+    build: .
+    env_file:
+      - .env
+    environment:
+      VAGG_CORE_DATABASE_URL: sqlite+aiosqlite:////var/lib/vagg/db.sqlite
+    ports:
+      - "8443:8443"
+    volumes:
+      - vagg_core_data:/var/lib/vagg
+
+volumes:
+  vagg_core_data:
