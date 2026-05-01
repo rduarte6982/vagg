@@ -76,9 +76,7 @@ class TestRefreshHappyPath:
         jwt_signer: JWTSigner,
     ) -> None:
         _, client = app_and_client
-        license_key = await _seed_and_activate(
-            client, session_factory, "sub_ref_01", "cus_ref_01"
-        )
+        license_key = await _seed_and_activate(client, session_factory, "sub_ref_01", "cus_ref_01")
 
         resp = await client.post(
             "/api/v1/refresh",
@@ -149,9 +147,7 @@ class TestRefreshRejections:
         session_factory: async_sessionmaker[Any],
     ) -> None:
         _, client = app_and_client
-        license_key = await _seed_and_activate(
-            client, session_factory, "sub_ref_mm", "cus_ref_mm"
-        )
+        license_key = await _seed_and_activate(client, session_factory, "sub_ref_mm", "cus_ref_mm")
 
         resp = await client.post(
             "/api/v1/refresh",

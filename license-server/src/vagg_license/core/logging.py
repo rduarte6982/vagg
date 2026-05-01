@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import sys
+from typing import Any
 
 import structlog
 
@@ -32,5 +33,8 @@ def configure_logging(level: str = "INFO") -> None:
     )
 
 
-def get_logger(name: str) -> structlog.stdlib.BoundLogger:
+def get_logger(name: str) -> Any:
+    """Returns a structlog bound logger. Type is ``Any`` because structlog's runtime
+    return shape (BoundLoggerLazyProxy → BoundLogger after first call) does not match
+    a single static type."""
     return structlog.get_logger(name)

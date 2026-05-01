@@ -49,4 +49,4 @@ sys.exit(0 if urllib.request.urlopen('http://localhost:8080/health',timeout=3).s
     || exit 1
 
 # Run migrations then start uvicorn. Migration is idempotent (alembic upgrade head).
-CMD ["sh", "-c", "alembic upgrade head && exec uvicorn vagg_license.main:app --host 0.0.0.0 --port 8080"]
+CMD ["sh", "-c", "alembic upgrade head && exec uvicorn --factory vagg_license.main:create_app --host 0.0.0.0 --port 8080"]

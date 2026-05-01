@@ -40,9 +40,7 @@ async def _seed_license_via_webhook(
     assert resp.status_code == 200
 
 
-async def _get_license_key(
-    session_factory: async_sessionmaker[Any], subscription_id: str
-) -> str:
+async def _get_license_key(session_factory: async_sessionmaker[Any], subscription_id: str) -> str:
     async with session_factory() as session:
         result = await session.execute(
             select(License).where(License.stripe_subscription_id == subscription_id)

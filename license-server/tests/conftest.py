@@ -25,7 +25,6 @@ from vagg_license.main import create_app
 from vagg_license.services.jwt_signer import JWTSigner
 from vagg_license.services.stripe_client import StripeClient
 
-
 # ----- Ed25519 keypair (ephemeral per test session) -----
 
 

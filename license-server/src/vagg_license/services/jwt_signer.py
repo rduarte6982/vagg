@@ -122,7 +122,7 @@ class JWTSigner:
 
     def verify(self, token: str) -> dict[str, Any]:
         """Verify a previously-issued token. Used by tests and self-check on issue."""
-        return pyjwt.decode(  # type: ignore[no-any-return]
+        return pyjwt.decode(
             token,
             self._public_key,
             algorithms=["EdDSA"],

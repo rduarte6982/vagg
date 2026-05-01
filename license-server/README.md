@@ -66,8 +66,8 @@ mypy --strict src
 pytest                      # com testcontainers (precisa Docker)
 pytest -m "not integration" # só unitários (sem Docker)
 
-# Subir servidor em dev
-uvicorn vagg_license.main:app --reload --port 8080
+# Subir servidor em dev (factory mode — evita avaliar Settings() no import)
+uvicorn --factory vagg_license.main:create_app --reload --port 8080
 ```
 
 ### Testando webhooks com Stripe CLI

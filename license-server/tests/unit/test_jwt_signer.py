@@ -100,9 +100,7 @@ class TestJWTSigner:
         with pytest.raises(pyjwt.InvalidSignatureError):
             pyjwt.decode(issued.token, attacker_pub, algorithms=["EdDSA"])
 
-    def test_expired_token_rejected(
-        self, ed25519_keypair_pem: tuple[str, str]
-    ) -> None:
+    def test_expired_token_rejected(self, ed25519_keypair_pem: tuple[str, str]) -> None:
         private_pem, public_pem = ed25519_keypair_pem
         short_signer = JWTSigner(
             private_key_pem=private_pem,

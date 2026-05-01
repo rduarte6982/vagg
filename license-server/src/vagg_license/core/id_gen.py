@@ -12,7 +12,7 @@ import secrets
 import time
 import uuid
 
-_LICENSE_KEY_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"  # no 0/O, 1/I/L
+_LICENSE_KEY_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"  # no 0/O, no 1/I/L
 
 
 def uuid7() -> uuid.UUID:

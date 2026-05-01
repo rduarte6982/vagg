@@ -81,4 +81,6 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     return app
 
 
-app = create_app()
+# Uvicorn entrypoint uses the factory pattern: `uvicorn vagg_license.main:create_app --factory`.
+# This avoids evaluating Settings() (which requires env vars) at module import time, so tests
+# can `from vagg_license.main import create_app` without triggering missing-env errors.

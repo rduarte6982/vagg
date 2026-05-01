@@ -48,7 +48,7 @@ class StripeClient:
     def construct_event(self, payload: bytes, signature_header: str) -> stripe.Event:
         """Verify Stripe-Signature against payload. Raises on tampering."""
         try:
-            return stripe.Webhook.construct_event(
+            event: stripe.Event = stripe.Webhook.construct_event(  # type: ignore[no-untyped-call]
                 payload=payload,
                 sig_header=signature_header,
                 secret=self._webhook_secret,
@@ -56,6 +56,7 @@ class StripeClient:
             )
         except (stripe.SignatureVerificationError, ValueError) as exc:
             raise WebhookSignatureInvalidError(detail=str(exc)) from exc
+        return event
 
     # ----- Subscription lookup -----
 
@@ -110,12 +111,13 @@ class StripeClient:
             status = LicenseStatus(sub_status)
         except ValueError as exc:
             # Stripe has more states (trialing, incomplete...). Map conservatively.
-            status = self._map_stripe_status(sub_status)
-            if status is None:
+            mapped = self._map_stripe_status(sub_status)
+            if mapped is None:
                 raise StripeIntegrationError(
                     detail=f"unsupported stripe status: {sub_status}",
                     context={"status": sub_status},
                 ) from exc
+            status = mapped
 
         cust_id = sub["customer"] if isinstance(sub, dict) else sub.customer
         if not isinstance(cust_id, str):
