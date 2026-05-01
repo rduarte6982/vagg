@@ -1,0 +1,114 @@
+name: core-ci
+
+# CI dos componentes Python (vagg-core e vagg-license-server).
+# license-server: Fase 1 (esta PR). core: stub até Fase 2.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'core/**'
+      - 'license-server/**'
+      - '.github/workflows/core-ci.yml'
+      - 'Makefile'
+  pull_request:
+    paths:
+      - 'core/**'
+      - 'license-server/**'
+      - '.github/workflows/core-ci.yml'
+      - 'Makefile'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: core-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  license-server:
+    name: license-server (lint + test)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: vagg
+          POSTGRES_PASSWORD: vagg
+          POSTGRES_DB: vagg_license_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U vagg -d vagg_license_test"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+
+    env:
+      VAGG_LICENSE_TEST_DATABASE_URL: postgresql+asyncpg://vagg:vagg@localhost:5432/vagg_license_test
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+          cache-dependency-path: 'license-server/pyproject.toml'
+
+      - name: Install
+        working-directory: license-server
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+
+      - name: Lint (ruff)
+        working-directory: license-server
+        run: |
+          ruff check .
+          ruff format --check .
+
+      - name: Type check (mypy --strict)
+        working-directory: license-server
+        run: mypy --strict src
+
+      - name: Migrations apply cleanly (alembic upgrade head)
+        working-directory: license-server
+        env:
+          VAGG_LICENSE_DATABASE_URL: ${{ env.VAGG_LICENSE_TEST_DATABASE_URL }}
+          VAGG_LICENSE_JWT_PRIVATE_KEY_PEM: "placeholder"
+          VAGG_LICENSE_JWT_PUBLIC_KEY_PEM: "placeholder"
+          VAGG_LICENSE_STRIPE_API_KEY: "sk_test_placeholder"
+          VAGG_LICENSE_STRIPE_WEBHOOK_SECRET: "whsec_placeholder"
+        run: alembic upgrade head
+
+      - name: Tests
+        working-directory: license-server
+        run: pytest --cov=src --cov-report=term-missing --cov-report=xml --cov-fail-under=70
+
+      - name: License compliance (pip-licenses)
+        working-directory: license-server
+        run: |
+          pip install pip-licenses
+          pip-licenses --format=plain --with-urls \
+            --fail-on='AGPL;AGPL-3.0;AGPL-3.0-only;AGPL-3.0-or-later;GPL-3.0;GPL-3.0-only;GPL-3.0-or-later;SSPL;BUSL;BSL;FCL'
+
+  core:
+    name: core (stub até Fase 2)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Verifica presença de pyproject.toml
+        run: |
+          if [ -f core/pyproject.toml ]; then
+            echo "::notice::core/pyproject.toml presente — migrar este job para o template real"
+            exit 1
+          fi
+          echo "::notice::core ainda é stub (Fase 2)"

@@ -1,0 +1,41 @@
+# Garante LF em todo arquivo de texto (consistente com .editorconfig).
+# Crítico: shell scripts e Dockerfiles em CRLF quebram no Linux.
+
+* text=auto eol=lf
+
+# Binary files — never normalize.
+*.png    binary
+*.jpg    binary
+*.jpeg   binary
+*.gif    binary
+*.ico    binary
+*.pdf    binary
+*.zst    binary
+*.gz     binary
+*.zip    binary
+*.tar    binary
+*.img    binary
+*.iso    binary
+*.pem    binary
+*.key    binary
+*.crt    binary
+*.p12    binary
+
+# Force LF on text where mistakes are common.
+*.sh     text eol=lf
+*.bash   text eol=lf
+Dockerfile text eol=lf
+*.dockerfile text eol=lf
+Makefile text eol=lf
+*.mk     text eol=lf
+*.yml    text eol=lf
+*.yaml   text eol=lf
+*.py     text eol=lf
+*.toml   text eol=lf
+*.json   text eol=lf
+*.md     text eol=lf
+
+# CRLF on Windows-only files.
+*.bat    text eol=crlf
+*.cmd    text eol=crlf
+*.ps1    text eol=crlf

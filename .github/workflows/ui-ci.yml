@@ -1,0 +1,109 @@
+name: ui-ci
+
+# CI do frontend (vagg-ui).
+# Stub — expandido na Fase 7 com lint, type check, testes e build reais.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'ui/**'
+      - '.github/workflows/ui-ci.yml'
+  pull_request:
+    paths:
+      - 'ui/**'
+      - '.github/workflows/ui-ci.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ui-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint-and-test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Verifica presença de package.json
+        id: check
+        run: |
+          if [ -f "ui/package.json" ]; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::ui/package.json ainda não existe — pulando lint/test (habilitado na Fase 7)"
+          fi
+
+      - name: Setup Node.js 20
+        if: steps.check.outputs.ready == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: 'ui/package-lock.json'
+
+      - name: Install dependencies
+        if: steps.check.outputs.ready == 'true'
+        working-directory: ui
+        run: npm ci
+
+      - name: Lint (eslint + prettier)
+        if: steps.check.outputs.ready == 'true'
+        working-directory: ui
+        run: |
+          npm run lint
+          npm run format:check
+
+      - name: Type check (tsc)
+        if: steps.check.outputs.ready == 'true'
+        working-directory: ui
+        run: npm run typecheck
+
+      - name: Tests
+        if: steps.check.outputs.ready == 'true'
+        working-directory: ui
+        run: npm run test -- --run --coverage
+
+      - name: Build
+        if: steps.check.outputs.ready == 'true'
+        working-directory: ui
+        run: npm run build
+
+  license-check:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Verifica presença de package.json
+        id: check
+        run: |
+          if [ -f "ui/package.json" ]; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Setup Node.js 20
+        if: steps.check.outputs.ready == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Verifica licenças de dependências (SPEC §2.5)
+        if: steps.check.outputs.ready == 'true'
+        working-directory: ui
+        run: |
+          npm ci
+          npx license-checker --production --failOn 'AGPL;GPL-3.0;SSPL;BSL;FCL' --summary
+
+      - name: Sem package.json — pular
+        if: steps.check.outputs.ready != 'true'
+        run: echo "::notice::Stub — habilitado quando ui/package.json existir."

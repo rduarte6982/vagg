@@ -1,0 +1,73 @@
+name: release
+
+# Release pipeline. Disparado por push de tag vMAJOR.MINOR.PATCH (SPEC §2.4).
+# Stub — expandido na Fase 10 com:
+#   - Build e push de imagens Docker para ghcr.io (vagg-core, vagg-ui, tunnels-*)
+#   - Geração e assinatura Ed25519 da imagem appliance (.img.zst)
+#   - Atualização do manifest.json em releases.vagg.io para o updater
+#   - Publicação de checksums em https://vagg.io/install/checksums.txt
+#   - Publicação automática de release notes (Conventional Commits → CHANGELOG)
+
+on:
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+      - 'v[0-9]+.[0-9]+.[0-9]+-*'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Executar sem publicar artefatos'
+        type: boolean
+        default: true
+
+permissions:
+  contents: write
+  packages: write
+  id-token: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      version: ${{ steps.parse.outputs.version }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Parse versão da tag
+        id: parse
+        run: |
+          if [ "${{ github.event_name }}" = "push" ]; then
+            VERSION="${GITHUB_REF#refs/tags/v}"
+          else
+            VERSION="0.0.0-dev"
+          fi
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "::notice::Release versão ${VERSION}"
+
+  build-and-publish:
+    needs: validate
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Placeholder — build de artefatos
+        run: |
+          echo "::notice::Stub — pipeline de release real implementado na Fase 10"
+          echo "Versão: ${{ needs.validate.outputs.version }}"
+          echo "TODO Fase 10:"
+          echo "  - docker buildx build (core, ui, tunnels-*)"
+          echo "  - docker push ghcr.io/.../vagg-*:${{ needs.validate.outputs.version }}"
+          echo "  - packer build appliance image"
+          echo "  - assinar .img.zst com Ed25519"
+          echo "  - publicar manifest.json + checksums.txt"
+          echo "  - gerar release notes a partir de Conventional Commits"
