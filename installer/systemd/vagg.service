@@ -1,0 +1,21 @@
+[Unit]
+Description=VPN Aggregator stack (docker-compose)
+Documentation=https://github.com/rduarte6982/vagg
+Requires=docker.service
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=/etc/vagg
+EnvironmentFile=-/etc/vagg/core.env
+ExecStartPre=-/usr/bin/docker compose -f /etc/vagg/docker-compose.yml pull --quiet
+ExecStart=/usr/bin/docker compose -f /etc/vagg/docker-compose.yml up -d --remove-orphans
+ExecStop=/usr/bin/docker compose -f /etc/vagg/docker-compose.yml down
+TimeoutStartSec=300
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,57 @@
+# Stack do VPN Aggregator (SPEC §3.1 / Fase 10).
+#
+# Serviços:
+#   vagg-core  — API FastAPI (auth + CRUD + orchestrator)
+#   vagg-ui    — SPA React servida por nginx, proxia /api → core
+#   vagg-dns   — CoreDNS lendo /etc/coredns/Corefile gerado pelo core
+#
+# Tunnel containers NÃO ficam aqui — eles são criados dinamicamente pelo
+# vagg-core via Docker API (network: host) quando um cliente conecta.
+
+name: vagg
+
+services:
+  vagg-core:
+    image: ${VAGG_REGISTRY:-ghcr.io/rduarte6982/vagg}/core:${VAGG_VERSION:-latest}
+    restart: unless-stopped
+    env_file: /etc/vagg/core.env
+    network_mode: host        # § 4.3 — iptables/ip-route precisam do host net
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+    volumes:
+      - /var/lib/vagg/db:/var/lib/vagg/db
+      - /var/lib/vagg/clients:/var/lib/vagg/clients
+      - /var/lib/vagg/sockets:/var/lib/vagg/sockets
+      - /var/lib/vagg/dns-config:/var/lib/vagg/dns-config
+      - /etc/iproute2/rt_tables:/etc/iproute2/rt_tables
+      - /var/run/docker.sock:/var/run/docker.sock
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; urllib.request.urlopen('http://127.0.0.1:8443/api/v1/system/health',timeout=2)"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  vagg-dns:
+    image: coredns/coredns:1.11.1
+    restart: unless-stopped
+    network_mode: host
+    command: ["-conf", "/etc/coredns/Corefile"]
+    volumes:
+      - /var/lib/vagg/dns-config:/etc/coredns:ro
+    depends_on:
+      - vagg-core
+
+  vagg-ui:
+    image: ${VAGG_REGISTRY:-ghcr.io/rduarte6982/vagg}/ui:${VAGG_VERSION:-latest}
+    restart: unless-stopped
+    ports:
+      - "443:80"   # TLS termination is upstream of compose (caddy/nginx-proxy
+                   # ou direto o nginx do container com cert montado)
+    depends_on:
+      - vagg-core
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/healthz"]
+      interval: 15s
+      timeout: 5s
+      retries: 5

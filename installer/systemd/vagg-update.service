@@ -1,0 +1,11 @@
+[Unit]
+Description=VPN Aggregator auto-update (verifica novas releases e aplica)
+After=network-online.target docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/vagg-update --quiet
+# O updater faz snapshot antes do pull e rollback se health falhar; um
+# `restart` por falha aqui só duplicaria a recuperação.
+Nice=10
+IOSchedulingClass=idle

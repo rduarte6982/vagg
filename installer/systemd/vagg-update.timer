@@ -1,0 +1,11 @@
+[Unit]
+Description=Roda vagg-update diariamente
+
+[Timer]
+# 03:30 hora local — fora do horário comercial dos consultores BR.
+OnCalendar=*-*-* 03:30:00
+RandomizedDelaySec=15min
+Persistent=true
+
+[Install]
+WantedBy=timers.target
