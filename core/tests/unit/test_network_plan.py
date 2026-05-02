@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+import pytest
+
 from vagg_core.services.network_plan import (
     ClientNet,
+    ConsultantAccess,
     NatMappingSpec,
     build_plan,
     iface_name,
@@ -11,12 +14,19 @@ from vagg_core.services.network_plan import (
 )
 
 
-def _client(slug: str, *, virt: str = "10.200.1.0/24", real: str = "192.168.1.0/24") -> ClientNet:
+def _client(
+    slug: str,
+    *,
+    virt: str = "10.200.1.0/24",
+    real: str = "192.168.1.0/24",
+    accesses: tuple[ConsultantAccess, ...] = (),
+) -> ClientNet:
     return ClientNet(
         id=slug,
         virtual_cidr=virt,
         real_cidr=real,
         nat_mappings=(NatMappingSpec(virtual_cidr=virt, real_cidr=real),),
+        accesses=accesses,
     )
 
 
@@ -76,8 +86,10 @@ class TestBuildPlan:
         ) in content
         # mangle marker
         assert "-A PREROUTING -d 10.200.1.0/24 -j MARK --set-mark 0x1" in content
-        # filter allow + log + default deny
-        assert "-A FORWARD -d 10.200.1.0/24 -j ACCEPT" in content
+        # filter forwards into the per-client RBAC chain (Fase 8).
+        assert "-A FORWARD -d 10.200.1.0/24 -j VAGG-RBAC-" in content
+        # Empty access set → chain has only the LOG + DROP tail (default-deny).
+        assert "VAGG_DENY_RBAC petroleo" in content
 
         # ip rule + ip route texts
         assert plan.ip_rules == ("fwmark 0x1 lookup vagg-petroleo",)
@@ -120,6 +132,68 @@ class TestBuildPlan:
         assert (
             f"-A POSTROUTING -s 192.168.1.0/24 -o {iface_b} -j NETMAP --to 10.200.2.0/24"
         ) in content
+
+
+class TestRbacChain:
+    """SPEC §7 / Fase 8 — per-client RBAC chain emitted by build_plan."""
+
+    def test_full_scope_emits_simple_accept(self) -> None:
+        c = _client(
+            "petroleo",
+            accesses=(ConsultantAccess(src_ip="10.8.0.42", scope_kind="full", scope_value=None),),
+        )
+        plan = build_plan(virtual_range="10.200.0.0/16", clients=[c])
+        content = plan.iptables_restore_content
+        # The per-client chain has an ACCEPT line for the consultant's pool IP.
+        assert "-s 10.8.0.42/32 -j ACCEPT" in content
+        # Tail is still LOG + DROP.
+        assert "VAGG_DENY_RBAC petroleo" in content
+
+    def test_subnet_scope_includes_dst(self) -> None:
+        c = _client(
+            "petroleo",
+            accesses=(
+                ConsultantAccess(
+                    src_ip="10.8.0.42",
+                    scope_kind="subnet",
+                    scope_value="10.200.1.128/26",
+                ),
+            ),
+        )
+        plan = build_plan(virtual_range="10.200.0.0/16", clients=[c])
+        assert "-s 10.8.0.42/32 -d 10.200.1.128/26 -j ACCEPT" in plan.iptables_restore_content
+
+    def test_host_scope_appends_slash_32(self) -> None:
+        c = _client(
+            "petroleo",
+            accesses=(
+                ConsultantAccess(src_ip="10.8.0.42", scope_kind="host", scope_value="10.200.1.50"),
+            ),
+        )
+        plan = build_plan(virtual_range="10.200.0.0/16", clients=[c])
+        assert "-s 10.8.0.42/32 -d 10.200.1.50/32 -j ACCEPT" in plan.iptables_restore_content
+
+    def test_default_deny_when_no_accesses(self) -> None:
+        c = _client("petroleo", accesses=())
+        plan = build_plan(virtual_range="10.200.0.0/16", clients=[c])
+        content = plan.iptables_restore_content
+        # No ACCEPT inside the per-client chain — tail still drops.
+        chain_marker = "-A VAGG-RBAC-"
+        accepts_in_chain = [
+            line
+            for line in content.splitlines()
+            if line.startswith(chain_marker) and " -j ACCEPT" in line
+        ]
+        assert accepts_in_chain == []
+        assert "VAGG_DENY_RBAC petroleo" in content
+
+    def test_subnet_without_value_raises(self) -> None:
+        c = _client(
+            "petroleo",
+            accesses=(ConsultantAccess(src_ip="10.8.0.42", scope_kind="subnet", scope_value=None),),
+        )
+        with pytest.raises(ValueError, match="subnet scope requires scope_value"):
+            build_plan(virtual_range="10.200.0.0/16", clients=[c])
 
 
 class TestSysctls:

@@ -13,10 +13,11 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from vagg_core.core.logging import get_logger
-from vagg_core.db.models import Client, TunnelState, TunnelStatus
+from vagg_core.db.models import Client, Consultant, Policy, TunnelState, TunnelStatus
 from vagg_core.services.network_applier import NetworkApplier
 from vagg_core.services.network_plan import (
     ClientNet,
+    ConsultantAccess,
     NatMappingSpec,
     NetworkPlan,
     build_plan,
@@ -76,15 +77,53 @@ class NetworkManager:
                 .order_by(Client.id)
             )
             result = await session.execute(stmt)
+            clients = list(result.scalars().all())
+
+            # SPEC §7 / Fase 8: pull policies + consultants together so the
+            # RBAC chain has a row per (consultant, client) pair.
+            access_by_client = await self._collect_accesses(session)
+
             rows: list[ClientNet] = []
-            for client in result.scalars().all():
-                # Avoid lazy-loading nat_mappings under async by fetching them in the
-                # same statement via the relationship's lazy="selectin" (set in models).
-                rows.append(_to_client_net(client))
+            for client in clients:
+                rows.append(_to_client_net(client, access_by_client.get(client.id, ())))
             return rows
 
+    async def _collect_accesses(
+        self, session: AsyncSession
+    ) -> dict[str, tuple[ConsultantAccess, ...]]:
+        """Index every (consultant, client) policy whose consultant is active and
+        has a static_pool_ip mapped (Opção B — see SPEC §7.2).
 
-def _to_client_net(client: Any) -> ClientNet:
+        Policies whose consultant is inactive or lacks a static_pool_ip are
+        skipped. The CIDR/host scope value is forwarded as-is; the planner
+        validates shape at render time.
+        """
+        stmt = (
+            select(Policy, Consultant)
+            .join(Consultant, Policy.consultant_id == Consultant.id)
+            .where(
+                Consultant.active.is_(True),
+                Consultant.static_pool_ip.is_not(None),
+            )
+        )
+        result = await session.execute(stmt)
+        out: dict[str, list[ConsultantAccess]] = {}
+        for policy, consultant in result.all():
+            ip = consultant.static_pool_ip
+            if ip is None:
+                continue
+            out.setdefault(policy.client_id, []).append(
+                ConsultantAccess(
+                    src_ip=ip,
+                    scope_kind=policy.scope_kind.value,
+                    scope_value=policy.scope_value,
+                )
+            )
+        # Freeze for hashability — the planner sorts already so we don't sort here.
+        return {k: tuple(v) for k, v in out.items()}
+
+
+def _to_client_net(client: Any, accesses: tuple[ConsultantAccess, ...]) -> ClientNet:
     """Convert an ORM Client into the planner's ``ClientNet`` snapshot."""
     mappings: list[NatMappingSpec] = []
     if client.nat_mappings:
@@ -100,4 +139,5 @@ def _to_client_net(client: Any) -> ClientNet:
         virtual_cidr=client.virtual_cidr,
         real_cidr=client.real_cidr,
         nat_mappings=tuple(mappings),
+        accesses=accesses,
     )

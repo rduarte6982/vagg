@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
+import contextlib
 from datetime import datetime
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, Query, Request, status
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
@@ -14,6 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from vagg_core.api.deps import CurrentAdmin, get_db, require_admin
 from vagg_core.core.errors import ConflictError, NotFoundError
 from vagg_core.db.models import Client, Consultant, Policy, PolicyScopeKind
+from vagg_core.services.audit import record_event
 
 router = APIRouter(prefix="/api/v1/policies", tags=["policies"])
 
@@ -69,7 +71,8 @@ async def list_policies(
 @router.post("", response_model=PolicyOut, status_code=status.HTTP_201_CREATED)
 async def create_policy(
     body: PolicyCreate,
-    _: Annotated[CurrentAdmin, Depends(require_admin)],
+    request: Request,
+    actor: Annotated[CurrentAdmin, Depends(require_admin)],
     session: Annotated[AsyncSession, Depends(get_db)],
 ) -> PolicyOut:
     # Confirm referenced consultant + client exist (FK alone would 500 in some drivers).
@@ -109,7 +112,35 @@ async def create_policy(
             "policy duplicada (mesma combinação consultant/client/scope)",
             context={"consultant_id": body.consultant_id, "client_id": body.client_id},
         ) from exc
+
+    await record_event(
+        session,
+        event_type="policy.created",
+        actor_consultant_id=getattr(actor, "id", None),
+        payload={
+            "policy_id": policy.id,
+            "consultant_id": policy.consultant_id,
+            "client_id": policy.client_id,
+            "scope_kind": policy.scope_kind.value,
+            "scope_value": policy.scope_value,
+        },
+    )
+
+    # SPEC Fase 8 critério: "adicionar policy libera acesso em < 5s".
+    # Trigger an immediate iptables rebuild so the new ACCEPT line goes in
+    # without waiting for the next tunnel event.
+    await _maybe_rebuild_network(request)
     return _to_out(policy)
+
+
+async def _maybe_rebuild_network(request: Request) -> None:
+    network_manager = getattr(request.app.state, "network_manager", None)
+    if network_manager is None:
+        return
+    # Failing the API call on rebuild glitch would leave a half-applied state
+    # exposed to the admin; the health worker retries periodically anyway.
+    with contextlib.suppress(Exception):
+        await network_manager.rebuild()
 
 
 @router.get("/{policy_id}", response_model=PolicyOut)
@@ -127,10 +158,27 @@ async def get_policy(
 @router.delete("/{policy_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_policy(
     policy_id: int,
-    _: Annotated[CurrentAdmin, Depends(require_admin)],
+    request: Request,
+    actor: Annotated[CurrentAdmin, Depends(require_admin)],
     session: Annotated[AsyncSession, Depends(get_db)],
 ) -> None:
     obj = await session.get(Policy, policy_id)
     if obj is None:
         raise NotFoundError("policy não encontrada", context={"id": policy_id})
+    payload = {
+        "policy_id": obj.id,
+        "consultant_id": obj.consultant_id,
+        "client_id": obj.client_id,
+        "scope_kind": obj.scope_kind.value,
+        "scope_value": obj.scope_value,
+    }
     await session.delete(obj)
+    await session.flush()
+    await record_event(
+        session,
+        event_type="policy.deleted",
+        actor_consultant_id=getattr(actor, "id", None),
+        payload=payload,
+    )
+    # SPEC Fase 8 critério: "remover policy revoga sessões em < 5s".
+    await _maybe_rebuild_network(request)

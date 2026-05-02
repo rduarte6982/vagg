@@ -62,6 +62,20 @@ class NatMappingSpec:
 
 
 @dataclass(frozen=True, slots=True)
+class ConsultantAccess:
+    """One row per (consultant, client) policy used by the iptables planner.
+
+    ``src_ip`` is the consultant's static-pool IP (SPEC §7.2 Opção B).
+    ``scope_value`` is None for ``full`` scope, a CIDR for ``subnet``, or a
+    single IP for ``host``.
+    """
+
+    src_ip: str
+    scope_kind: str
+    scope_value: str | None
+
+
+@dataclass(frozen=True, slots=True)
 class ClientNet:
     """Snapshot of a connected client used by the planner."""
 
@@ -69,6 +83,10 @@ class ClientNet:
     virtual_cidr: str
     real_cidr: str
     nat_mappings: tuple[NatMappingSpec, ...]
+    # SPEC §7 / Fase 8 — empty tuple means default-deny still applies; the
+    # client's destination chain has no ACCEPT lines and only the LOG/DROP
+    # tail catches packets.
+    accesses: tuple[ConsultantAccess, ...] = field(default_factory=tuple)
 
 
 # ----- Outputs -----
@@ -210,13 +228,61 @@ def _build_iptables(
         ":FORWARD DROP [0:0]",  # default-deny (SPEC §7.3)
         ":OUTPUT ACCEPT [0:0]",
     ]
+    # SPEC §7 / Fase 8: declare the per-client RBAC chains up front so iptables
+    # restore can reference them before they're populated.
+    for client in clients:
+        filter_lines.append(f":{_rbac_chain(client.id)} - [0:0]")
+
     # Established/related is always allowed.
     filter_lines.append("-A FORWARD -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT")
-    # Per-client allow.
+    # Per-client: jump into the RBAC chain. The chain itself decides ACCEPT/DROP
+    # based on consultant identity (source IP) + policy scope.
     for client in clients:
-        filter_lines.append(f"-A FORWARD -d {client.virtual_cidr} -j ACCEPT")
-    # Log everything else hitting the virtual range, then default-deny catches it.
+        filter_lines.append(f"-A FORWARD -d {client.virtual_cidr} -j {_rbac_chain(client.id)}")
+    # Log + drop the tail (default-deny when nothing matched).
     filter_lines.append(f'-A FORWARD -d {virtual_range} -j LOG --log-prefix "VAGG_DROP_NO_CLIENT "')
+
+    # Body of each per-client RBAC chain (SPEC §7.3 default-deny).
+    for client in clients:
+        chain = _rbac_chain(client.id)
+        for access in client.accesses:
+            filter_lines.append(_rbac_rule(chain=chain, client=client, access=access))
+        # Tail: log denied attempts then default-deny via FORWARD policy.
+        filter_lines.append(f'-A {chain} -j LOG --log-prefix "VAGG_DENY_RBAC {client.id} "')
+        filter_lines.append(f"-A {chain} -j DROP")
+
     filter_lines.append("COMMIT")
 
     return "\n".join(nat_lines + [""] + mangle_lines + [""] + filter_lines + [""])
+
+
+def _rbac_chain(client_id: str) -> str:
+    """Stable iptables chain name (Linux limit is 28 chars)."""
+    digest = hashlib.sha1(  # noqa: S324 — non-crypto identifier
+        client_id.encode("utf-8"), usedforsecurity=False
+    ).hexdigest()[:10]
+    return f"VAGG-RBAC-{digest}"
+
+
+def _rbac_rule(*, chain: str, client: ClientNet, access: ConsultantAccess) -> str:
+    """Render one ACCEPT line in the RBAC chain.
+
+    full       → src ACCEPT (entire virtual_cidr already established by the
+                 FORWARD jump → chain)
+    subnet:X   → src + dst CIDR ACCEPT
+    host:X     → src + dst /32 ACCEPT
+    """
+    base = f"-A {chain} -s {access.src_ip}/32"
+    if access.scope_kind == "full":
+        return f"{base} -j ACCEPT"
+    if access.scope_kind == "subnet":
+        if not access.scope_value:
+            raise ValueError(f"subnet scope requires scope_value (client {client.id})")
+        return f"{base} -d {access.scope_value} -j ACCEPT"
+    if access.scope_kind == "host":
+        if not access.scope_value:
+            raise ValueError(f"host scope requires scope_value (client {client.id})")
+        # Allow scope_value with or without /32 suffix.
+        target = access.scope_value if "/" in access.scope_value else f"{access.scope_value}/32"
+        return f"{base} -d {target} -j ACCEPT"
+    raise ValueError(f"unknown scope_kind {access.scope_kind!r} (client {client.id})")
