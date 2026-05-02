@@ -21,6 +21,7 @@ from vagg_core.core.errors import CoreError
 from vagg_core.core.logging import configure_logging, get_logger
 from vagg_core.core.security import JWTSigner
 from vagg_core.db.session import make_engine, make_session_factory
+from vagg_core.services.dns_manager import DnsManagerProtocol, maybe_dns_manager
 from vagg_core.services.network_applier import NetworkApplier, shell_runner
 from vagg_core.services.network_manager import NetworkManager
 from vagg_core.services.tunnel_orchestrator import (
@@ -67,6 +68,19 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     # connection failures surface in startup logs, not on the first request.
     docker_client = docker_from_env()
     app.state.docker = docker_client
+
+    # DNS manager (SPEC §4.4 / §5.3). Disabled by default; installer turns it
+    # on and points dns_config_path at the volume the vagg-dns container reads.
+    dns_manager: DnsManagerProtocol = maybe_dns_manager(
+        enabled=settings.dns_enabled,
+        session_factory=app.state.session_factory,
+        config_path=settings.dns_config_path,
+        domain=settings.domain,
+        docker=docker_client,
+        container_name=settings.dns_container_name,
+    )
+    app.state.dns_manager = dns_manager
+
     app.state.tunnel_orchestrator = TunnelOrchestrator(
         docker=docker_client,
         config_dir=settings.tunnels_config_dir,
@@ -76,6 +90,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         restart_policy=settings.tunnels_restart_policy,
         controller_timeout_s=settings.tunnels_controller_timeout_s,
         network_manager=network_manager,
+        dns_manager=dns_manager,
     )
 
     health_worker = TunnelHealthWorker(

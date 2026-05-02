@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Request
 
 from vagg_core import __version__
+from vagg_core.api.deps import CurrentAdmin
+from vagg_core.services.dns_manager import DnsManagerProtocol
 
 router = APIRouter(prefix="/api/v1/system", tags=["system"])
 
@@ -33,3 +35,16 @@ async def license_status() -> dict[str, object]:
 async def metrics() -> dict[str, str]:
     """Stub. Real Prometheus exposition is part of operational hardening (SPEC §10.5)."""
     return {"note": "Prometheus exposition implementada em uma fase posterior"}
+
+
+@router.post("/dns/regenerate")
+async def dns_regenerate(request: Request, _: CurrentAdmin) -> dict[str, object]:
+    """Force a Corefile regenerate + SIGUSR1 reload (SPEC §4.4 / §5.3 / Fase 6).
+
+    Normally this happens automatically on tunnel connect/disconnect; the
+    endpoint is for ops who tweak ``dns_server`` on a Client and want to push
+    the change without bouncing tunnels.
+    """
+    dns_manager: DnsManagerProtocol = request.app.state.dns_manager
+    corefile = await dns_manager.regenerate_and_reload()
+    return {"reloaded": True, "corefile_bytes": len(corefile.encode("utf-8"))}

@@ -1,0 +1,36 @@
+# Exemplo do Corefile gerado pelo vagg-core (SPEC §4.4 + §5.3 / Fase 6).
+# NÃO edite este arquivo — ele é apenas referência. O Corefile real é
+# escrito em ${VAGG_CORE_DNS_CONFIG_PATH} a cada conexão de túnel.
+
+. {
+    forward . 8.8.8.8 8.8.4.4
+    cache 30
+}
+
+petroleo.vpn.consultoria.com.br:53 {
+    forward . 192.168.1.10:53 {
+        bind tun-abc123def4
+        force_tcp
+        prefer_udp
+    }
+    rewrite stop {
+        answer name regex (.*) {1}
+        answer value regex 192\.168\.1\.(\d+) 10.200.1.{1}
+    }
+    cache 30
+    log
+}
+
+varejo.vpn.consultoria.com.br:53 {
+    forward . 192.168.1.10:53 {
+        bind tun-1234567890
+        force_tcp
+        prefer_udp
+    }
+    rewrite stop {
+        answer name regex (.*) {1}
+        answer value regex 192\.168\.1\.(\d+) 10.200.2.{1}
+    }
+    cache 30
+    log
+}

@@ -30,6 +30,7 @@ from aiodocker.exceptions import DockerError
 from vagg_core.core.errors import ConflictError, CoreError, NotFoundError
 from vagg_core.core.logging import get_logger
 from vagg_core.db.models import TunnelState, VpnType
+from vagg_core.services.dns_manager import DnsManagerProtocol
 from vagg_core.services.network_manager import NetworkManagerProtocol
 from vagg_core.services.network_plan import iface_name
 
@@ -103,6 +104,7 @@ class TunnelOrchestrator:
         restart_policy: str = "unless-stopped",
         controller_timeout_s: float = 2.0,
         network_manager: NetworkManagerProtocol | None = None,
+        dns_manager: DnsManagerProtocol | None = None,
     ) -> None:
         self._docker = docker
         self._config_dir = config_dir
@@ -115,6 +117,7 @@ class TunnelOrchestrator:
         self._restart = restart_policy
         self._controller_timeout = controller_timeout_s
         self._network_manager = network_manager
+        self._dns_manager = dns_manager
 
     # ----- Helpers -----
 
@@ -259,6 +262,15 @@ class TunnelOrchestrator:
                     client_id=client_id,
                     error=str(exc.detail),
                 )
+        if self._dns_manager is not None:
+            try:
+                await self._dns_manager.regenerate_and_reload()
+            except CoreError as exc:
+                log.warning(
+                    "tunnel.connect.dns_reload_failed",
+                    client_id=client_id,
+                    error=str(exc.detail),
+                )
         return str(container.id)
 
     async def disconnect(self, client_id: str) -> None:
@@ -289,6 +301,15 @@ class TunnelOrchestrator:
             except CoreError as exc:
                 log.warning(
                     "tunnel.disconnect.network_rebuild_failed",
+                    client_id=client_id,
+                    error=str(exc.detail),
+                )
+        if self._dns_manager is not None:
+            try:
+                await self._dns_manager.regenerate_and_reload()
+            except CoreError as exc:
+                log.warning(
+                    "tunnel.disconnect.dns_reload_failed",
                     client_id=client_id,
                     error=str(exc.detail),
                 )

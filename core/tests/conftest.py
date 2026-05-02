@@ -24,6 +24,7 @@ from vagg_core.core.security import JWTSigner, hash_password
 from vagg_core.db.models import Base, TunnelState, VpnType
 from vagg_core.db.session import make_engine, make_session_factory
 from vagg_core.main import create_app
+from vagg_core.services.dns_manager import _NoopDnsManager
 from vagg_core.services.tunnel_orchestrator import (
     TunnelStatusReport,
 )
@@ -175,6 +176,7 @@ async def app_and_client(
         refresh_ttl_seconds=settings.jwt_refresh_ttl_seconds,
     )
     app.state.tunnel_orchestrator = fake_orchestrator
+    app.state.dns_manager = _NoopDnsManager()
 
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://testserver") as client:

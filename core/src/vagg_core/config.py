@@ -84,6 +84,14 @@ class Settings(BaseSettings):
     network_apply_enabled: bool = False
     rt_tables_path: Path = Path("/etc/iproute2/rt_tables")
 
+    # ----- DNS (SPEC §4.4 / §5.3 / Fase 6) -----
+    # Disabled by default — installer sets ``dns_enabled=true`` and points
+    # ``dns_config_path`` at the volume shared with the vagg-dns container.
+    dns_enabled: bool = False
+    dns_config_path: Path = Path("/etc/coredns/Corefile")
+    dns_container_name: str = "vagg-dns"
+    dns_default_forwarders: str = "8.8.8.8,8.8.4.4"
+
 
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:
