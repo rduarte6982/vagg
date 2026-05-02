@@ -177,6 +177,11 @@ async def app_and_client(
     )
     app.state.tunnel_orchestrator = fake_orchestrator
     app.state.dns_manager = _NoopDnsManager()
+    # Portal signing key — generate a throwaway in-memory key so endpoints
+    # that read app.state.portal_signing_key don't 500.
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+
+    app.state.portal_signing_key = Ed25519PrivateKey.generate()
 
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://testserver") as client:

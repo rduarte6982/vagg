@@ -21,6 +21,9 @@ from vagg_core.core.errors import CoreError
 from vagg_core.core.logging import configure_logging, get_logger
 from vagg_core.core.security import JWTSigner
 from vagg_core.db.session import make_engine, make_session_factory
+from vagg_core.portal import router as portal_router
+from vagg_core.portal.admin import router as portal_admin_router
+from vagg_core.portal.report import load_or_create_signing_key
 from vagg_core.services.dns_manager import DnsManagerProtocol, maybe_dns_manager
 from vagg_core.services.network_applier import NetworkApplier, shell_runner
 from vagg_core.services.network_manager import NetworkManager
@@ -93,6 +96,12 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         dns_manager=dns_manager,
     )
 
+    # Portal signing key (Fase 11). Loaded once at startup so the lifespan
+    # surfaces a fresh key file if the volume was reset; subsequent requests
+    # re-use the cached key.
+    if settings.portal_enabled:
+        app.state.portal_signing_key = load_or_create_signing_key(settings.portal_signing_key_path)
+
     health_worker = TunnelHealthWorker(
         session_factory=app.state.session_factory,
         orchestrator=app.state.tunnel_orchestrator,
@@ -136,6 +145,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(policies.router)
     app.include_router(tunnels.router)
     app.include_router(audit.router)
+    app.include_router(portal_admin_router)
+    app.include_router(portal_router)
 
     @app.exception_handler(CoreError)
     async def _domain_error_handler(_: Request, exc: CoreError) -> JSONResponse:

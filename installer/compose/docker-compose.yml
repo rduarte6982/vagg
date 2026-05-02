@@ -55,3 +55,19 @@ services:
       interval: 15s
       timeout: 5s
       retries: 5
+
+  # Fase 11 — portal de transparência. Domínio público dedicado servido por
+  # este container; o instalador adiciona um TLS terminator na frente
+  # (recomendação: cloudflare ou caddy).
+  vagg-portal:
+    image: ${VAGG_REGISTRY:-ghcr.io/rduarte6982/vagg}/portal:${VAGG_VERSION:-latest}
+    restart: unless-stopped
+    ports:
+      - "8444:80"
+    depends_on:
+      - vagg-core
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/healthz"]
+      interval: 15s
+      timeout: 5s
+      retries: 5

@@ -84,6 +84,10 @@ class Settings(BaseSettings):
     network_apply_enabled: bool = False
     rt_tables_path: Path = Path("/etc/iproute2/rt_tables")
 
+    # ----- Portal de Transparência (SPEC §5.6 / Fase 11) -----
+    portal_enabled: bool = True
+    portal_signing_key_path: Path = Path("/var/lib/vagg/portal-signing-key.pem")
+
     # ----- DNS (SPEC §4.4 / §5.3 / Fase 6) -----
     # Disabled by default — installer sets ``dns_enabled=true`` and points
     # ``dns_config_path`` at the volume shared with the vagg-dns container.

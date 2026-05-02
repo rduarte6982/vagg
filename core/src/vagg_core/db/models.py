@@ -271,6 +271,93 @@ class Policy(Base):
     )
 
 
+class ExternalViewer(Base):
+    """Cliente-final auditor (SPEC §5.6 / Fase 11). Não compartilha tabela com
+    Consultant — isolamento de identidade entre staff da consultoria e
+    auditores do cliente final é por design."""
+
+    __tablename__ = "external_viewers"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    client_id: Mapped[str] = mapped_column(
+        String(64), ForeignKey("clients.id", ondelete="CASCADE"), nullable=False
+    )
+    email: Mapped[str] = mapped_column(String(254), nullable=False)
+    display_name: Mapped[str] = mapped_column(String(128), nullable=False)
+    role: Mapped[str] = mapped_column(String(16), nullable=False, default="auditor")
+    totp_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    totp_secret: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    invited_by_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("consultants.id", ondelete="SET NULL"), nullable=True
+    )
+    invited_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+    last_login_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+
+    __table_args__ = (
+        UniqueConstraint("client_id", "email", name="uq_external_viewer_client_email"),
+        CheckConstraint(
+            "role IN ('auditor','manager','compliance')",
+            name="ck_external_viewer_role",
+        ),
+    )
+
+
+class ExternalViewerToken(Base):
+    """Magic link / refresh token (SPEC §5.6).
+
+    Um único token cobre os dois fluxos: ``kind='magic'`` é consumido em
+    ``GET /portal/auth/consume?token=...`` e troca por uma sessão; ``kind='session'``
+    representa a sessão emitida (cookie + JWT id). Tokens magic têm TTL 15min;
+    sessions têm TTL 8h.
+    """
+
+    __tablename__ = "external_viewer_tokens"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    viewer_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("external_viewers.id", ondelete="CASCADE"), nullable=False
+    )
+    kind: Mapped[str] = mapped_column(String(16), nullable=False)
+    # SHA-256 do token bruto — o token bruto só existe no link enviado por email.
+    token_hash: Mapped[str] = mapped_column(String(64), nullable=False, unique=True)
+    issued_ip: Mapped[str | None] = mapped_column(String(45), nullable=True)
+    user_agent: Mapped[str | None] = mapped_column(String(256), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    consumed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    __table_args__ = (
+        CheckConstraint("kind IN ('magic','session')", name="ck_external_viewer_token_kind"),
+        Index("ix_external_viewer_tokens_viewer", "viewer_id"),
+    )
+
+
+class PortalAccessLog(Base):
+    """Audit dedicado do portal — separado de audit_events para que o cliente
+    final possa ver quem viu o quê SEM expor o audit do admin."""
+
+    __tablename__ = "portal_access_log"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    viewer_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("external_viewers.id", ondelete="CASCADE"), nullable=False
+    )
+    client_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    endpoint: Mapped[str] = mapped_column(String(128), nullable=False)
+    ip_address: Mapped[str] = mapped_column(String(45), nullable=False)
+    occurred_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+
+    __table_args__ = (Index("ix_portal_access_log_viewer", "viewer_id", "occurred_at"),)
+
+
 class AuditEvent(Base):
     """Append-only audit log with hash chain (SPEC §8)."""
 
