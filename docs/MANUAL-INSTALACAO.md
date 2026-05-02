@@ -4,10 +4,12 @@ Manual passo-a-passo para instalar o VPN Aggregator num mini PC com Ubuntu
 Server 24.04 LTS. Cobre desde o boot da ISO até o primeiro consultor
 acessando um cliente real.
 
-> **Estado do manual:** os textos de cada passo estão escritos. As capturas
-> de tela marcadas com `_(print: …)_` serão geradas automaticamente após o
-> Playwright MCP carregar (reiniciar VS Code uma vez para ativar) — basta
-> me pedir para "gerar os prints" depois de subir o stack localmente.
+> Os screenshots em `docs/manual-prints/` foram gerados pelo script
+> `scripts/capture/capture.mjs` (Puppeteer) com fixtures determinísticas
+> para representar um deploy real com 3 clientes e 2 consultores.
+> Marcadores `_(print: …)_` que ainda aparecem se referem a telas que só
+> existem em momentos do processo (instalador Subiquity, OTP dialog, etc.)
+> e exigem a máquina real para serem capturadas.
 
 ---
 
@@ -191,16 +193,18 @@ nslookup test.vpn.suaconsultoria.com.br                   # deve resolver
 
 Abra `https://vpn.suaconsultoria.com.br:8443` no navegador.
 
-_(print: tela de login do vagg-ui)_
+![Tela de login do vagg-ui](manual-prints/ui-01-login.png)
 
 Logar com email do admin + senha do `admin-credentials.txt`.
 
+![Login preenchido](manual-prints/ui-02-login-filled.png)
+
 Trocar senha imediatamente em **Sistema → Conta**.
 
-_(print: dashboard limpo, todos os contadores em 0)_
+![Dashboard com 2 consultores ativos e 3 clientes](manual-prints/ui-03-dashboard.png)
 
 Idioma alterna no canto superior direito (PT/EN), tema dark/light no
-ícone ☼/☾.
+ícone ☼/☾ ao lado.
 
 ---
 
@@ -208,7 +212,11 @@ Idioma alterna no canto superior direito (PT/EN), tema dark/light no
 
 Menu **Clientes → + Novo cliente**.
 
-_(print: formulário de novo cliente vazio)_
+![Lista de clientes — petroleo e varejo online, industria iniciando](manual-prints/ui-04-clients-list.png)
+
+> O badge `Online` (verde) significa túnel UP e RBAC carregado; `Iniciando`
+> (laranja) é o handshake/auth em curso; `Com erro` (vermelho) indica
+> falha — clique no nome do cliente → **Logs** para ver o motivo.
 
 Preencher:
 
@@ -254,17 +262,22 @@ errada ou MFA pendente (ver §9 abaixo).
 | Static pool IP | IP fixo no pool da OpenVPN (Opção B do SPEC §7.2) |
 | Role | `viewer` / `operator` / `admin` |
 
-_(print: formulário de novo consultor)_
+![Lista de consultores cadastrados](manual-prints/ui-05-consultants-list.png)
 
 ### 8.2 Policies
 
-**Policies → + Nova política**:
+**Políticas → + Nova política**:
 
 - Consultor: João Silva
 - Cliente: Petróleo
 - Escopo: `full` (acesso completo) ou `subnet:10.200.1.128/26` ou `host:10.200.1.50`
 
-_(print: matriz de policies preenchida)_
+![Matriz consultor × cliente com escopos diferentes](manual-prints/ui-06-policies-list.png)
+
+> No exemplo, João Silva tem acesso `full` ao Petróleo mas só ao
+> subnet `10.200.2.128/26` do Varejo — RBAC iptables emite linhas
+> distintas: `-A VAGG-RBAC-petroleo -s 10.8.0.10/32 -j ACCEPT` e
+> `-A VAGG-RBAC-varejo -s 10.8.0.10/32 -d 10.200.2.128/26 -j ACCEPT`.
 
 > Por padrão, **default-deny**: sem policy explícita, o consultor não
 > acessa nada. Iptables emite `LOG VAGG_DENY_RBAC ...` em pacotes
@@ -303,7 +316,17 @@ ssh user@prd-sap.petroleo.vpn.suaconsultoria.com.br   # SSH real
 Os três precisam funcionar. Em **Auditoria** você vê o evento
 `tunnel.access` registrado com timestamp + consultor + host destino.
 
-_(print: timeline de auditoria mostrando o tunnel.access)_
+![Auditoria com tunnel.access, policy.created e tunnel.denied](manual-prints/ui-07-audit-list.png)
+
+Botão **Exportar CSV** / **Exportar JSON** baixa o que estiver filtrado
+no momento. Para auditorias periódicas, o endpoint
+`GET /api/v1/audit/export.ndjson` retorna streaming line-by-line —
+escala a milhões de eventos sem segurar memória.
+
+Em **Sistema** você vê versão, saúde, status de licença e um botão para
+forçar regenerar o Corefile do vagg-dns:
+
+![Tela de sistema](manual-prints/ui-08-system.png)
 
 ---
 
@@ -327,9 +350,18 @@ curl -fsSL -X POST https://vpn.suaconsultoria.com.br:8443/api/v1/external-viewer
 A resposta inclui `totp_uri` — encaminhe para o auditor configurar
 Google/Microsoft Authenticator.
 
-_(print: portal de transparência — tela de login pedindo magic link)_
+O auditor recebe um email com o link, abre `https://transparency.suaconsultoria.com.br`:
 
-_(print: dashboard do portal com counters e botão "Baixar relatório")_
+![Portal — pedido de magic link](manual-prints/portal-01-login.png)
+
+Após preencher email + cliente:
+
+![Portal — formulário preenchido](manual-prints/portal-02-login-filled.png)
+
+Clica no link do email, faz TOTP (se habilitado) e cai no dashboard
+público read-only. Watermark com email + tudo escopado ao cliente dele:
+
+![Dashboard do portal com timeline e botão de relatório](manual-prints/portal-03-dashboard.png)
 
 O PDF gerado tem assinatura Ed25519 verificável offline com:
 
