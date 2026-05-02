@@ -74,6 +74,25 @@ test-tunnels:
 tunnels-build:
 	docker build -f tunnels/openvpn/Dockerfile -t vagg/tunnel-openvpn:dev tunnels/
 
+# ----- Build de TODAS as imagens p/ instalação de teste local -----
+# Cada imagem é tagueada como ghcr.io/rduarte6982/vagg/<comp>:test, que é
+# o tag esperado pelo installer/compose/docker-compose.yml em modo teste.
+# Requer Docker daemon rodando.
+.PHONY: images-build
+images-build:
+	@echo "[images] core"
+	docker build -f core/Dockerfile -t ghcr.io/rduarte6982/vagg/core:test core
+	@echo "[images] ui"
+	docker build -f ui/Dockerfile -t ghcr.io/rduarte6982/vagg/ui:test ui
+	@echo "[images] portal"
+	docker build -f portal/Dockerfile -t ghcr.io/rduarte6982/vagg/portal:test portal
+	@for proto in openvpn openconnect openfortivpn wireguard strongswan; do \
+		echo "[images] tunnel-$$proto"; \
+		docker build -f tunnels/$$proto/Dockerfile \
+			-t ghcr.io/rduarte6982/vagg/tunnel-$$proto:test tunnels/; \
+	done
+	@echo "[images] todas as 8 imagens construídas com tag :test"
+
 # ----- License compliance (SPEC §2.5 / §13.5) -----
 
 license-check: license-check-license-server license-check-core

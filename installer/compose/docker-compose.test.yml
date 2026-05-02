@@ -1,0 +1,60 @@
+# docker-compose para INSTALAÇÃO DE TESTE (scripts/test-install.sh).
+#
+# Diferenças vs docker-compose.yml de produção:
+#   - vagg-core NÃO usa network_mode: host (iptables/ip-route ficam OFF)
+#     → tunnel containers ainda podem subir mas sem NAT real / DNS
+#       split-horizon completo
+#   - Portas expostas em 0.0.0.0 para acessar do navegador da LAN
+#   - Sem TLS — o painel é http (não https)
+#   - Sem auto-update (vagg-update não é instalado)
+#   - Volumes apontam para /var/lib/vagg como em produção (mantém compat
+#     com test-install.sh --reset)
+
+name: vagg-test
+
+services:
+  vagg-core:
+    image: ${VAGG_REGISTRY:-ghcr.io/rduarte6982/vagg}/core:${VAGG_VERSION:-test}
+    restart: unless-stopped
+    env_file: /etc/vagg/core.env
+    ports:
+      - "8443:8443"
+    volumes:
+      - /var/lib/vagg/db:/var/lib/vagg/db
+      - /var/lib/vagg/clients:/var/lib/vagg/clients
+      - /var/lib/vagg/sockets:/var/lib/vagg/sockets
+      - /var/lib/vagg/dns-config:/var/lib/vagg/dns-config
+      - /var/run/docker.sock:/var/run/docker.sock
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; urllib.request.urlopen('http://127.0.0.1:8443/api/v1/system/health',timeout=2)"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  vagg-dns:
+    image: coredns/coredns:1.11.1
+    restart: unless-stopped
+    command: ["-conf", "/etc/coredns/Corefile"]
+    volumes:
+      - /var/lib/vagg/dns-config:/etc/coredns:ro
+    ports:
+      - "127.0.0.1:5353:53/udp"   # 53 conflita com systemd-resolved no Ubuntu
+      - "127.0.0.1:5353:53/tcp"
+    depends_on:
+      - vagg-core
+
+  vagg-ui:
+    image: ${VAGG_REGISTRY:-ghcr.io/rduarte6982/vagg}/ui:${VAGG_VERSION:-test}
+    restart: unless-stopped
+    ports:
+      - "8080:80"
+    depends_on:
+      - vagg-core
+
+  vagg-portal:
+    image: ${VAGG_REGISTRY:-ghcr.io/rduarte6982/vagg}/portal:${VAGG_VERSION:-test}
+    restart: unless-stopped
+    ports:
+      - "8081:80"
+    depends_on:
+      - vagg-core
