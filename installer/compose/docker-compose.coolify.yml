@@ -44,6 +44,7 @@ services:
       - VAGG_CORE_PORTAL_SIGNING_KEY_PATH=/var/lib/vagg/portal-signing-key.pem
     volumes:
       - vagg-data:/var/lib/vagg
+      - vagg-dns-config:/var/lib/vagg/dns-config
     expose:
       - "8443"
     healthcheck:
@@ -94,9 +95,11 @@ services:
     restart: unless-stopped
     command: ["-conf", "/etc/coredns/Corefile"]
     volumes:
-      - vagg-data:/etc/coredns:ro
+      - vagg-dns-config:/etc/coredns:ro
     depends_on:
-      - vagg-core
+      vagg-core:
+        condition: service_healthy
 
 volumes:
   vagg-data:
+  vagg-dns-config:

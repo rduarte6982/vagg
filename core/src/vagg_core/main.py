@@ -84,6 +84,15 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     )
     app.state.dns_manager = dns_manager
 
+    # Seed an initial Corefile so vagg-dns finds *something* on first start
+    # (otherwise coredns crashes and restart-loops until a tunnel triggers
+    # regenerate). Best-effort — if it fails, the worker retries later.
+    if settings.dns_enabled:
+        try:
+            await dns_manager.regenerate()
+        except Exception as exc:  # noqa: BLE001
+            log.warning("vagg_core.dns_regenerate_init_failed", error=str(exc))
+
     app.state.tunnel_orchestrator = TunnelOrchestrator(
         docker=docker_client,
         config_dir=settings.tunnels_config_dir,

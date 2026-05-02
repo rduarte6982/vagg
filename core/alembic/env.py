@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import os
 from logging.config import fileConfig
 
 from alembic import context
@@ -10,7 +11,6 @@ from sqlalchemy import pool
 from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
-from vagg_core.config import get_settings
 from vagg_core.db.models import Base
 
 config = context.config
@@ -21,14 +21,30 @@ if config.config_file_name is not None:
 target_metadata = Base.metadata
 
 
-def _resolve_url() -> str:
-    try:
-        return get_settings().database_url.get_secret_value()
-    except Exception:
-        url = config.get_main_option("sqlalchemy.url")
-        if not url:
-            raise RuntimeError("VAGG_CORE_DATABASE_URL is required for migrations") from None
+def _normalize_db_url(url: str) -> str:
+    """Same logic as vagg_core.config — keep them in sync."""
+    if url.startswith("sqlite+aiosqlite://"):
         return url
+    if url.startswith("sqlite://"):
+        return "sqlite+aiosqlite://" + url.removeprefix("sqlite://")
+    return url
+
+
+def _resolve_url() -> str:
+    """Migration only needs the DB URL — read it directly from env to avoid
+    pulling in the full Settings (which requires admin_password_hash and
+    jwt_secret that are unrelated to migrations)."""
+    url = os.environ.get("VAGG_CORE_DATABASE_URL", "").strip()
+    if url:
+        return _normalize_db_url(url)
+    # Fall back to alembic.ini's `sqlalchemy.url` if someone runs migrations
+    # outside the container. Last-resort default makes `alembic --help` work.
+    fallback = config.get_main_option("sqlalchemy.url")
+    if fallback:
+        return _normalize_db_url(fallback)
+    raise RuntimeError(
+        "VAGG_CORE_DATABASE_URL is required for migrations (set in env or in alembic.ini)"
+    )
 
 
 def run_migrations_offline() -> None:
