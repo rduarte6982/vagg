@@ -4,6 +4,10 @@
       "type": "stdio",
       "command": "npx",
       "args": ["-y", "@playwright/mcp@latest"]
+    },
+    "coolify": {
+      "type": "http",
+      "url": "https://coolify-mcp.duarteapps.cloud/mcp"
     }
   }
 }
