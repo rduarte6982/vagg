@@ -7,6 +7,9 @@ COPY . .
 RUN npm run build
 
 FROM nginx:1.27-alpine
+LABEL org.opencontainers.image.source="https://github.com/rduarte6982/vagg"
+LABEL org.opencontainers.image.description="VPN Aggregator transparency portal"
+LABEL org.opencontainers.image.licenses="Apache-2.0"
 RUN rm -rf /usr/share/nginx/html/* /etc/nginx/conf.d/default.conf
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=builder /app/dist /usr/share/nginx/html

@@ -22,6 +22,13 @@ RUN pip install --upgrade pip wheel && pip wheel --wheel-dir /wheels .
 
 FROM python:3.12-slim-bookworm AS runtime
 
+# OCI annotation — vincula o pacote no GHCR ao repo. Sem isso a página
+# /users/<user>/packages mostra o pacote "solto" e o toggle de visibility
+# não aparece em alguns layouts da UI do GitHub.
+LABEL org.opencontainers.image.source="https://github.com/rduarte6982/vagg"
+LABEL org.opencontainers.image.description="VPN Aggregator core API"
+LABEL org.opencontainers.image.licenses="Apache-2.0"
+
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1

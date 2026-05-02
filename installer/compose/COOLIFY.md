@@ -7,9 +7,31 @@ caminho completo (com túneis VPN reais) use [`scripts/test-install.sh`](../../s
 
 1. Coolify funcionando com Traefik
 2. Push em `main` já rodou o workflow `publish-images` ao menos uma vez
-3. Pacotes ghcr.io marcados como **public** em
-   https://github.com/users/rduarte6982/packages → cada um (`vagg/core`,
-   `vagg/ui`, `vagg/portal`) → Settings → Change visibility → Public
+3. Pacotes ghcr.io ou **públicos** OU Coolify configurado com PAT
+   (ver duas opções abaixo).
+
+### Opção A — Pacotes públicos (mais simples, se a UI permitir)
+
+Após o segundo run do `publish-images` (com OCI source labels), os pacotes
+aparecem linkados ao repo em https://github.com/rduarte6982/vagg/packages.
+Em cada um → ícone de engrenagem → **Change package visibility** → **Public**.
+
+Se a opção `Public` não estiver disponível, use a Opção B.
+
+### Opção B — Pacotes privados + PAT no Coolify
+
+1. Crie um PAT classic em https://github.com/settings/tokens com escopo
+   apenas `read:packages`. Copie o token.
+2. No Coolify: **Servers → seu servidor → Private Registries → + Add**
+   - URL: `ghcr.io`
+   - Username: `rduarte6982`
+   - Password: o PAT
+3. No `docker-compose.coolify.yml` adicione `pull_policy: always` em cada
+   serviço com `image: ghcr.io/...` (já está no template, só conferir)
+4. No deploy, Coolify usa as credenciais salvas para pullar.
+
+> **Aviso**: o PAT vence quando você definir (recomendo 90 dias). Anote
+> a renovação no calendário ou crie a próxima versão antes do vencimento.
 
 ## Passos no Coolify
 
