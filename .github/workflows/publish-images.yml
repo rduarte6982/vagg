@@ -1,0 +1,85 @@
+name: publish-images
+
+# Publica as 3 imagens da stack do Coolify (core, ui, portal) em
+# ghcr.io/rduarte6982/vagg a cada push em main, taggeando :main + :latest.
+#
+# Os 5 tunnel containers NÃO são publicados aqui — eles são imagens internas
+# do vagg-core e só fazem sentido quando o orchestrator roda em network_mode:
+# host. O fluxo Coolify usa só os 3 serviços base.
+#
+# Após o primeiro run, marque os pacotes como public em
+# https://github.com/users/rduarte6982/packages para que Coolify pulle sem auth.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'core/**'
+      - 'ui/**'
+      - 'portal/**'
+      - '.github/workflows/publish-images.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: publish-images-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  publish:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: core
+            context: core
+          - name: ui
+            context: ui
+          - name: portal
+            context: portal
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to ghcr.io
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Compute tags
+        id: tags
+        run: |
+          IMAGE="ghcr.io/${{ github.repository_owner }}/vagg/${{ matrix.name }}"
+          IMAGE_LC="$(echo "$IMAGE" | tr '[:upper:]' '[:lower:]')"
+          SHA_TAG="${IMAGE_LC}:${GITHUB_SHA::7}"
+          MAIN_TAG="${IMAGE_LC}:main"
+          LATEST_TAG="${IMAGE_LC}:latest"
+          {
+            echo "image=$IMAGE_LC"
+            echo "tags<<EOF"
+            echo "$SHA_TAG"
+            echo "$MAIN_TAG"
+            echo "$LATEST_TAG"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.context }}
+          file: ${{ matrix.context }}/Dockerfile
+          push: true
+          tags: ${{ steps.tags.outputs.tags }}
+          cache-from: type=gha,scope=${{ matrix.name }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.name }}

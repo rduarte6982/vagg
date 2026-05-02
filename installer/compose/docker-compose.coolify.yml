@@ -1,0 +1,102 @@
+# vagg-stack para Coolify (Docker Compose Empty / sem git source).
+#
+# Usa imagens publicadas em ghcr.io/rduarte6982/vagg/{core,ui,portal}:latest
+# pela GitHub Actions `.github/workflows/publish-images.yml`. Coolify pulla
+# direto, sem precisar clonar o repo.
+#
+# Pré-requisitos:
+#   1. Workflow publish-images já rodou pelo menos uma vez (push em main)
+#   2. Pacotes ghcr.io marcados como public em
+#      https://github.com/users/rduarte6982/packages
+#   3. Variáveis VAGG_ADMIN_PASSWORD_HASH definidas no Coolify
+#
+# Limitações vs install completo:
+#   - Sem iptables NETMAP (Coolify roda em namespace isolado)
+#   - Túneis VPN reais não funcionam — para isso use scripts/test-install.sh
+#     no mini PC. Esse compose serve só para hospedar o painel + portal +
+#     vagg-core como API (testar UI, audit, magic links etc).
+
+services:
+  vagg-core:
+    image: ghcr.io/rduarte6982/vagg/core:latest
+    restart: unless-stopped
+    environment:
+      - SERVICE_FQDN_VAGGCORE_8443
+      - VAGG_CORE_ENVIRONMENT=production
+      - VAGG_CORE_LOG_LEVEL=INFO
+      - VAGG_CORE_BIND_HOST=0.0.0.0
+      - VAGG_CORE_BIND_PORT=8443
+      - VAGG_CORE_DOMAIN=${SERVICE_FQDN_VAGGCORE}
+      - VAGG_CORE_DATABASE_URL=sqlite+aiosqlite:////var/lib/vagg/db/vagg-core.db
+      - VAGG_CORE_JWT_SECRET=${SERVICE_PASSWORD_64_VAGGJWT}
+      - VAGG_CORE_ADMIN_EMAIL=${VAGG_ADMIN_EMAIL:-admin@vagg.local}
+      - VAGG_CORE_ADMIN_PASSWORD_HASH=${VAGG_ADMIN_PASSWORD_HASH}
+      - VAGG_CORE_LICENSE_KEY=${VAGG_LICENSE_KEY:-test-license}
+      - VAGG_CORE_LICENSE_SERVER=${VAGG_LICENSE_SERVER:-http://127.0.0.1:9999}
+      - VAGG_CORE_NETWORK_APPLY_ENABLED=false
+      - VAGG_CORE_DNS_ENABLED=true
+      - VAGG_CORE_DNS_CONFIG_PATH=/var/lib/vagg/dns-config/Corefile
+      - VAGG_CORE_DNS_CONTAINER_NAME=vagg-dns
+      - VAGG_CORE_TUNNELS_CONFIG_DIR=/var/lib/vagg/clients
+      - VAGG_CORE_TUNNELS_SOCKETS_DIR=/var/lib/vagg/sockets
+      - VAGG_CORE_TUNNELS_IMAGE_TAG=test
+      - VAGG_CORE_PORTAL_ENABLED=true
+      - VAGG_CORE_PORTAL_SIGNING_KEY_PATH=/var/lib/vagg/portal-signing-key.pem
+    volumes:
+      - vagg-data:/var/lib/vagg
+    expose:
+      - "8443"
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8443/api/v1/system/health',timeout=2)"
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+
+  vagg-ui:
+    image: ghcr.io/rduarte6982/vagg/ui:latest
+    restart: unless-stopped
+    environment:
+      - SERVICE_FQDN_VAGGUI_80
+    expose:
+      - "80"
+    depends_on:
+      vagg-core:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/healthz"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  vagg-portal:
+    image: ghcr.io/rduarte6982/vagg/portal:latest
+    restart: unless-stopped
+    environment:
+      - SERVICE_FQDN_VAGGPORTAL_80
+    expose:
+      - "80"
+    depends_on:
+      vagg-core:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/healthz"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  vagg-dns:
+    image: coredns/coredns:1.11.1
+    restart: unless-stopped
+    command: ["-conf", "/etc/coredns/Corefile"]
+    volumes:
+      - vagg-data:/etc/coredns:ro
+    depends_on:
+      - vagg-core
+
+volumes:
+  vagg-data:
