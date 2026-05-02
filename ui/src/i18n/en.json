@@ -1,0 +1,118 @@
+{
+  "app": {
+    "title": "VPN Aggregator",
+    "subtitle": "Admin console"
+  },
+  "nav": {
+    "dashboard": "Dashboard",
+    "clients": "Clients",
+    "consultants": "Consultants",
+    "policies": "Policies",
+    "audit": "Audit",
+    "system": "System",
+    "logout": "Logout",
+    "language": "Language",
+    "theme_dark": "Dark theme",
+    "theme_light": "Light theme"
+  },
+  "login": {
+    "email": "Email",
+    "password": "Password",
+    "submit": "Sign in",
+    "submitting": "Signing in...",
+    "error": "Authentication failed"
+  },
+  "common": {
+    "loading": "Loading...",
+    "error": "Error",
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "edit": "Edit",
+    "create": "Create",
+    "actions": "Actions",
+    "yes": "Yes",
+    "no": "No",
+    "search": "Search",
+    "export_csv": "Export CSV",
+    "export_json": "Export JSON",
+    "refresh": "Refresh"
+  },
+  "dashboard": {
+    "title": "Dashboard",
+    "consultants_active": "Active consultants",
+    "clients_online": "Clients online",
+    "tunnels_total": "Configured tunnels",
+    "license_status": "License status"
+  },
+  "clients": {
+    "title": "Clients",
+    "create": "New client",
+    "id": "ID",
+    "name": "Name",
+    "vpn_type": "Protocol",
+    "virtual_cidr": "Virtual CIDR",
+    "real_cidr": "Real CIDR",
+    "dns_server": "DNS",
+    "tunnel_state": "Tunnel state",
+    "actions": "Actions",
+    "connect": "Connect",
+    "disconnect": "Disconnect",
+    "send_otp": "Send OTP",
+    "logs": "Logs",
+    "details": "Details",
+    "config_text": "Tunnel configuration",
+    "username": "Username",
+    "password": "Password",
+    "save": "Save client",
+    "delete_confirm": "Delete this client?",
+    "no_clients": "No clients yet.",
+    "states": {
+      "stopped": "Stopped",
+      "starting": "Starting",
+      "up": "Up",
+      "down": "Down",
+      "errored": "Errored"
+    }
+  },
+  "consultants": {
+    "title": "Consultants",
+    "create": "New consultant",
+    "email": "Email",
+    "name": "Name",
+    "openvpn_username": "OpenVPN username",
+    "static_pool_ip": "Static pool IP",
+    "role": "Role",
+    "active": "Active",
+    "delete_confirm": "Delete this consultant?",
+    "no_consultants": "No consultants yet."
+  },
+  "policies": {
+    "title": "Policies (consultant × client)",
+    "create": "New policy",
+    "consultant": "Consultant",
+    "client": "Client",
+    "scope_kind": "Scope kind",
+    "scope_value": "Scope value",
+    "expires_at": "Expires at",
+    "no_policies": "No policies yet."
+  },
+  "audit": {
+    "title": "Audit",
+    "event_type": "Event type",
+    "actor": "Actor",
+    "occurred_at": "When",
+    "payload": "Detail",
+    "filter_event_type": "Filter by type",
+    "filter_consultant": "Filter by consultant",
+    "no_events": "No events."
+  },
+  "system": {
+    "title": "System",
+    "version": "Version",
+    "license": "License",
+    "health": "Health",
+    "regenerate_dns": "Regenerate DNS Corefile",
+    "regenerated": "Corefile regenerated and CoreDNS reloaded."
+  }
+}

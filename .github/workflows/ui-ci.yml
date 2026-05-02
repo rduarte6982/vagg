@@ -45,13 +45,11 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'npm'
-          cache-dependency-path: 'ui/package-lock.json'
 
       - name: Install dependencies
         if: steps.check.outputs.ready == 'true'
         working-directory: ui
-        run: npm ci
+        run: npm install --no-audit --no-fund
 
       - name: Lint (eslint + prettier)
         if: steps.check.outputs.ready == 'true'
@@ -101,7 +99,7 @@ jobs:
         if: steps.check.outputs.ready == 'true'
         working-directory: ui
         run: |
-          npm ci
+          npm install --no-audit --no-fund
           npx license-checker --production --failOn 'AGPL;GPL-3.0;SSPL;BSL;FCL' --summary
 
       - name: Sem package.json — pular

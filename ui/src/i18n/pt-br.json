@@ -1,0 +1,118 @@
+{
+  "app": {
+    "title": "VPN Aggregator",
+    "subtitle": "Painel administrativo"
+  },
+  "nav": {
+    "dashboard": "Dashboard",
+    "clients": "Clientes",
+    "consultants": "Consultores",
+    "policies": "Políticas",
+    "audit": "Auditoria",
+    "system": "Sistema",
+    "logout": "Sair",
+    "language": "Idioma",
+    "theme_dark": "Tema escuro",
+    "theme_light": "Tema claro"
+  },
+  "login": {
+    "email": "E-mail",
+    "password": "Senha",
+    "submit": "Entrar",
+    "submitting": "Entrando...",
+    "error": "Falha de autenticação"
+  },
+  "common": {
+    "loading": "Carregando...",
+    "error": "Erro",
+    "save": "Salvar",
+    "cancel": "Cancelar",
+    "delete": "Excluir",
+    "edit": "Editar",
+    "create": "Criar",
+    "actions": "Ações",
+    "yes": "Sim",
+    "no": "Não",
+    "search": "Buscar",
+    "export_csv": "Exportar CSV",
+    "export_json": "Exportar JSON",
+    "refresh": "Atualizar"
+  },
+  "dashboard": {
+    "title": "Dashboard",
+    "consultants_active": "Consultores ativos",
+    "clients_online": "Clientes online",
+    "tunnels_total": "Túneis configurados",
+    "license_status": "Status da licença"
+  },
+  "clients": {
+    "title": "Clientes",
+    "create": "Novo cliente",
+    "id": "ID",
+    "name": "Nome",
+    "vpn_type": "Protocolo",
+    "virtual_cidr": "CIDR virtual",
+    "real_cidr": "CIDR real",
+    "dns_server": "DNS",
+    "tunnel_state": "Estado do túnel",
+    "actions": "Ações",
+    "connect": "Conectar",
+    "disconnect": "Desconectar",
+    "send_otp": "Enviar OTP",
+    "logs": "Logs",
+    "details": "Detalhes",
+    "config_text": "Configuração do túnel",
+    "username": "Usuário",
+    "password": "Senha",
+    "save": "Salvar cliente",
+    "delete_confirm": "Tem certeza que deseja excluir este cliente?",
+    "no_clients": "Nenhum cliente cadastrado.",
+    "states": {
+      "stopped": "Parado",
+      "starting": "Iniciando",
+      "up": "Online",
+      "down": "Offline",
+      "errored": "Com erro"
+    }
+  },
+  "consultants": {
+    "title": "Consultores",
+    "create": "Novo consultor",
+    "email": "E-mail",
+    "name": "Nome",
+    "openvpn_username": "Usuário OpenVPN",
+    "static_pool_ip": "IP estático",
+    "role": "Papel",
+    "active": "Ativo",
+    "delete_confirm": "Tem certeza que deseja excluir este consultor?",
+    "no_consultants": "Nenhum consultor cadastrado."
+  },
+  "policies": {
+    "title": "Políticas (consultor × cliente)",
+    "create": "Nova política",
+    "consultant": "Consultor",
+    "client": "Cliente",
+    "scope_kind": "Tipo de escopo",
+    "scope_value": "Valor do escopo",
+    "expires_at": "Expira em",
+    "no_policies": "Nenhuma política cadastrada."
+  },
+  "audit": {
+    "title": "Auditoria",
+    "event_type": "Tipo de evento",
+    "actor": "Ator",
+    "occurred_at": "Quando",
+    "payload": "Detalhes",
+    "filter_event_type": "Filtrar por tipo",
+    "filter_consultant": "Filtrar por consultor",
+    "no_events": "Nenhum evento."
+  },
+  "system": {
+    "title": "Sistema",
+    "version": "Versão",
+    "license": "Licença",
+    "health": "Saúde",
+    "regenerate_dns": "Regenerar Corefile DNS",
+    "regenerated": "Corefile regenerado e CoreDNS recarregado."
+  }
+}
