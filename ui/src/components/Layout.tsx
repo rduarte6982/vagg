@@ -6,14 +6,20 @@ import { useAuth } from '@/lib/auth-context';
 import { useTheme } from '@/lib/theme';
 import { cn } from '@/lib/utils';
 
-const NAV_ITEMS = [
+interface NavItem {
+  to: string;
+  key: string;
+  exact?: boolean;
+}
+
+const NAV_ITEMS: readonly NavItem[] = [
   { to: '/', key: 'dashboard', exact: true },
   { to: '/clients', key: 'clients' },
   { to: '/consultants', key: 'consultants' },
   { to: '/policies', key: 'policies' },
   { to: '/audit', key: 'audit' },
   { to: '/system', key: 'system' },
-] as const;
+];
 
 export function Layout() {
   const { t, i18n } = useTranslation();
