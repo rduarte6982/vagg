@@ -1,0 +1,354 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>VAGG · ROIT rebrand · Deck</title>
+<style>
+  :root {
+    --navy: #14283b;
+    --navy-2: #1b3148;
+    --navy-3: #243b56;
+    --gold: #d4a943;
+    --gold-2: #b88c2d;
+    --ink: #f1ece1;
+    --ink-2: #c9c2b3;
+    --ink-3: #8b8775;
+    --paper: #f6f5f1;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0; background: var(--navy);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Inter, sans-serif;
+    color: var(--ink); -webkit-font-smoothing: antialiased;
+  }
+  .deck { display: flex; flex-direction: column; gap: 0; }
+  .slide {
+    width: 100%; min-height: 100vh; padding: 80px 96px;
+    display: flex; flex-direction: column; justify-content: center;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+    page-break-after: always;
+    position: relative;
+  }
+  .slide.cover { background: linear-gradient(135deg, var(--navy) 0%, var(--navy-3) 100%); }
+  .slide.split { background: var(--navy-2); }
+  .slide.paper { background: var(--paper); color: var(--navy); }
+  .slide.paper h2, .slide.paper h3 { color: var(--navy); }
+  .slide.paper .muted { color: #5a5749; }
+
+  .num {
+    position: absolute; top: 32px; right: 48px;
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 13px; color: var(--gold); letter-spacing: 0.15em;
+    font-weight: 600;
+  }
+  .tag {
+    display: inline-block; font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 11px; letter-spacing: 0.25em; font-weight: 600;
+    color: var(--gold); margin-bottom: 16px; text-transform: uppercase;
+  }
+  h1 { font-size: 64px; line-height: 1.05; margin: 0 0 24px 0; font-weight: 700; letter-spacing: -0.02em; }
+  h2 { font-size: 44px; line-height: 1.1; margin: 0 0 32px 0; font-weight: 700; letter-spacing: -0.015em; }
+  h3 { font-size: 22px; margin: 0 0 12px 0; font-weight: 600; }
+  p, li { font-size: 18px; line-height: 1.55; color: var(--ink-2); margin: 0 0 12px 0; }
+  .lead { font-size: 22px; line-height: 1.5; color: var(--ink); }
+  .muted { color: var(--ink-3); }
+
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 48px; align-items: center; }
+  .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 32px; }
+  .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 24px; }
+
+  .card {
+    background: rgba(255,255,255,0.03); border: 1px solid rgba(212,169,67,0.15);
+    border-radius: 12px; padding: 24px;
+  }
+  .swatch {
+    aspect-ratio: 1; border-radius: 8px;
+    display: flex; flex-direction: column; justify-content: flex-end;
+    padding: 16px; font-family: 'JetBrains Mono', monospace; font-size: 12px;
+    border: 1px solid rgba(255,255,255,0.06);
+  }
+  .swatch .name { font-size: 14px; font-weight: 600; margin-bottom: 4px; }
+
+  img.shot {
+    width: 100%; border-radius: 8px;
+    box-shadow: 0 24px 60px -20px rgba(0,0,0,0.55), 0 2px 8px rgba(0,0,0,0.25);
+    border: 1px solid rgba(255,255,255,0.06);
+  }
+  img.logo-asset { display: block; max-width: 100%; height: auto; }
+
+  .row { display: flex; gap: 16px; flex-wrap: wrap; }
+  .pill {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 6px 12px; border-radius: 999px;
+    background: rgba(212,169,67,0.1); border: 1px solid rgba(212,169,67,0.25);
+    color: var(--gold); font-family: 'JetBrains Mono', monospace; font-size: 11px;
+    letter-spacing: 0.05em;
+  }
+  .check { color: var(--gold); margin-right: 8px; font-weight: 700; }
+
+  .wordmark {
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-weight: 600; letter-spacing: 0.02em;
+  }
+  .wordmark .dot { color: var(--gold); }
+  .by-roit {
+    display: block; font-size: 11px; letter-spacing: 0.2em;
+    color: var(--gold); font-weight: 600; margin-top: 4px;
+  }
+
+  pre {
+    background: rgba(0,0,0,0.25); border-radius: 8px; padding: 16px;
+    font-family: 'JetBrains Mono', monospace; font-size: 13px;
+    line-height: 1.5; color: var(--ink-2); overflow-x: auto;
+    border-left: 3px solid var(--gold);
+  }
+  code { color: var(--gold); }
+
+  .stat { text-align: center; }
+  .stat-num { font-size: 48px; font-weight: 700; color: var(--gold); line-height: 1; margin-bottom: 8px; }
+  .stat-label { font-size: 13px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-3); }
+
+  /* Print: cada slide vira página A4 */
+  @media print {
+    .slide { min-height: auto; height: 100vh; page-break-after: always; padding: 60px; }
+    body { background: var(--navy); }
+  }
+</style>
+</head>
+<body>
+<div class="deck">
+
+  <!-- 1. Cover -->
+  <section class="slide cover">
+    <div class="num">01 / 09</div>
+    <span class="tag">DESIGN SYSTEM REFRESH · 2026-05-07</span>
+    <h1>vagg<span style="color:var(--gold)">.</span> by ROIT</h1>
+    <p class="lead" style="max-width:680px">
+      O console de agregação de VPNs herda a identidade visual da ROIT —
+      navy profundo, ouro como acento único, geometria limpa, dark-first.
+    </p>
+    <div style="position:absolute; bottom:60px; left:96px; display:flex; align-items:center; gap:24px;">
+      <span class="wordmark" style="font-size:32px">
+        vagg<span class="dot">.</span>
+      </span>
+      <span style="height:32px;width:1px;background:rgba(255,255,255,0.15)"></span>
+      <span class="by-roit" style="margin-top:0">ROIT INNOVATION HUB</span>
+    </div>
+  </section>
+
+  <!-- 2. Why -->
+  <section class="slide">
+    <div class="num">02 / 09</div>
+    <span class="tag">CONTEXTO</span>
+    <h2>Por que rebrand</h2>
+    <div class="grid-2">
+      <div>
+        <p class="lead">VAGG é um produto interno da ROIT. A interface antiga usava uma paleta independente (verde + grafite) que não refletia essa origem.</p>
+        <p>Pra clientes finais, consultores e demos comerciais, a UI precisa transmitir <strong style="color:var(--gold)">"isso é ROIT"</strong> sem precisar explicar.</p>
+        <p class="muted">O rebrand foi feito sem alteração funcional — só camadas de tema, logo e tokens visuais.</p>
+      </div>
+      <div class="card">
+        <h3>Princípios do refresh</h3>
+        <p><span class="check">→</span>Cobrand: VAGG continua sendo o nome do produto, ROIT é a publisher</p>
+        <p><span class="check">→</span>Acento único: ouro substitui verde como cor primary</p>
+        <p><span class="check">→</span>Background navy substitui grafite neutro</p>
+        <p><span class="check">→</span>Zero impacto em código de negócio</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 3. Paleta -->
+  <section class="slide split">
+    <div class="num">03 / 09</div>
+    <span class="tag">DESIGN TOKENS</span>
+    <h2>Paleta ROIT</h2>
+    <div class="grid-4" style="margin-bottom:32px">
+      <div class="swatch" style="background:#14283b;color:#f1ece1">
+        <div class="name">navy</div>
+        <div>#14283B</div>
+        <div style="opacity:.7">background</div>
+      </div>
+      <div class="swatch" style="background:#1b3148;color:#f1ece1">
+        <div class="name">navy-2</div>
+        <div>#1B3148</div>
+        <div style="opacity:.7">surface</div>
+      </div>
+      <div class="swatch" style="background:#d4a943;color:#2a2010">
+        <div class="name">gold</div>
+        <div>#D4A943</div>
+        <div style="opacity:.7">primary</div>
+      </div>
+      <div class="swatch" style="background:#f6f5f1;color:#14283b">
+        <div class="name">paper</div>
+        <div>#F6F5F1</div>
+        <div style="opacity:.7">light alt</div>
+      </div>
+    </div>
+    <div class="grid-3">
+      <div class="card">
+        <h3 style="color:var(--gold)">Navy</h3>
+        <p>Background, sidebars, headers e cards. Serve de canvas neutro pro acento dourado se destacar.</p>
+      </div>
+      <div class="card">
+        <h3 style="color:var(--gold)">Gold</h3>
+        <p>Único acento. Botões primários, links ativos, LEDs, indicadores de estado positivo, badge "BY ROIT".</p>
+      </div>
+      <div class="card">
+        <h3 style="color:var(--gold)">Ink (sand)</h3>
+        <p>Texto principal em <code>#F1ECE1</code> — leve viés sand pra harmonizar com gold sem virar branco puro.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 4. Logo -->
+  <section class="slide">
+    <div class="num">04 / 09</div>
+    <span class="tag">BRAND MARK</span>
+    <h2>Logo evoluído</h2>
+    <div class="grid-2">
+      <div>
+        <p class="lead">Mark mantém a geometria <em>"agregador de rede"</em> do VAGG (4 nós convergindo num core central) — recolorida com a paleta ROIT.</p>
+        <p>Wordmark "vagg." conserva sua tipografia mono com o dot dourado. Tagline <strong style="color:var(--gold)">"BY ROIT"</strong> em small caps abaixo confirma a publisher.</p>
+        <pre>// VaggMark — após
+nodes:  cream  (--roit-ink-2)
+wires:  navy-2 (--roit-line-2)
+core:   <span style="color:var(--gold)">gold square</span>  (--roit-gold)</pre>
+      </div>
+      <div style="background:linear-gradient(135deg,var(--navy) 0%,var(--navy-3) 100%); padding:64px; border-radius:16px; display:flex; flex-direction:column; align-items:center; gap:32px;">
+        <svg viewBox="0 0 28 28" width="120" height="120">
+          <circle cx="4" cy="4" r="2" fill="#c9c2b3"/>
+          <circle cx="24" cy="4" r="2" fill="#c9c2b3"/>
+          <circle cx="4" cy="24" r="2" fill="#c9c2b3"/>
+          <circle cx="24" cy="24" r="2" fill="#c9c2b3"/>
+          <path d="M4 4 L14 14" stroke="#3a5675" stroke-width="1.4" fill="none"/>
+          <path d="M24 4 L14 14" stroke="#3a5675" stroke-width="1.4" fill="none"/>
+          <path d="M4 24 L14 14" stroke="#3a5675" stroke-width="1.4" fill="none"/>
+          <path d="M24 24 L14 14" stroke="#3a5675" stroke-width="1.4" fill="none"/>
+          <rect x="10" y="10" width="8" height="8" rx="1" fill="#d4a943"/>
+        </svg>
+        <div style="text-align:center;">
+          <span class="wordmark" style="font-size:36px">
+            vagg<span class="dot">.</span>
+          </span>
+          <span class="by-roit" style="margin-top:8px">BY ROIT</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 5. Antes -->
+  <section class="slide">
+    <div class="num">05 / 09</div>
+    <span class="tag">BEFORE</span>
+    <h2>Versão anterior — verde signal</h2>
+    <p class="muted" style="margin-bottom:24px">Background grafite #0b0d10 · Acento green oklch(78% 0.16 162) · Mark VAGG standalone</p>
+    <div style="background:rgba(255,255,255,0.03); padding:24px; border-radius:12px; border:1px dashed rgba(255,255,255,0.1);">
+      <p class="muted" style="text-align:center; font-style:italic;">[ screenshot da versão antiga — capturado em 2026-05-06 antes do rebrand ]</p>
+    </div>
+  </section>
+
+  <!-- 6. Depois - login -->
+  <section class="slide">
+    <div class="num">06 / 09</div>
+    <span class="tag">AFTER · LOGIN</span>
+    <h2>Login ROIT-branded</h2>
+    <div class="grid-2">
+      <div>
+        <p class="lead">Card de login adota o navy ROIT, botão primário em gold, tagline "BY ROIT" abaixo do wordmark.</p>
+        <ul style="list-style:none; padding:0;">
+          <li><span class="check">●</span>Background navy gradient</li>
+          <li><span class="check">●</span>Botão "Entrar" gold sólido</li>
+          <li><span class="check">●</span>Bullet points com dots gold</li>
+          <li><span class="check">●</span>Mark + wordmark cobrand</li>
+        </ul>
+      </div>
+      <img class="shot" src="uploads/roit-login.png" alt="Login screen" />
+    </div>
+  </section>
+
+  <!-- 7. Depois - dashboard -->
+  <section class="slide">
+    <div class="num">07 / 09</div>
+    <span class="tag">AFTER · DASHBOARD</span>
+    <h2>Dashboard com identidade nova</h2>
+    <img class="shot" src="uploads/roit-dashboard.png" alt="Dashboard" style="margin-bottom:16px" />
+    <div class="row">
+      <span class="pill">sidebar navy</span>
+      <span class="pill">led gold</span>
+      <span class="pill">topology hub</span>
+      <span class="pill">stat cards · gold accent</span>
+      <span class="pill">cobrand header</span>
+    </div>
+  </section>
+
+  <!-- 8. Implementação -->
+  <section class="slide split">
+    <div class="num">08 / 09</div>
+    <span class="tag">TECH</span>
+    <h2>O que mudou no código</h2>
+    <div class="grid-3">
+      <div class="card">
+        <h3>1. CSS tokens</h3>
+        <p><code>src/index.css</code></p>
+        <p class="muted">Variáveis HSL do tema shadcn remapeadas pra navy + gold. Vars <code>--vagg-*</code> aliasadas pra <code>--roit-*</code> mantendo retrocompatibilidade.</p>
+      </div>
+      <div class="card">
+        <h3>2. Logo SVG</h3>
+        <p><code>components/ui/vagg-logo.tsx</code></p>
+        <p class="muted">Mark recolorido (cream nodes, navy wires, gold core). Wordmark ganha tagline <strong style="color:var(--gold)">BY ROIT</strong> abaixo.</p>
+      </div>
+      <div class="card">
+        <h3>3. Badges + toasts</h3>
+        <p><code>badge.tsx</code> · <code>toast.tsx</code></p>
+        <p class="muted">Cores <em>hardcoded</em> oklch(78% 0.16 162) → oklch(75% 0.13 76) — substituição global em 3 arquivos.</p>
+      </div>
+    </div>
+    <div style="margin-top:32px" class="grid-3">
+      <div class="stat">
+        <div class="stat-num">3</div>
+        <div class="stat-label">arquivos de estilo alterados</div>
+      </div>
+      <div class="stat">
+        <div class="stat-num">0</div>
+        <div class="stat-label">mudanças em código de negócio</div>
+      </div>
+      <div class="stat">
+        <div class="stat-num">~10min</div>
+        <div class="stat-label">tempo total de rebrand</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 9. Próximos passos -->
+  <section class="slide cover">
+    <div class="num">09 / 09</div>
+    <span class="tag">CHECKLIST + NEXT</span>
+    <h2>Próximos passos</h2>
+    <div class="grid-2">
+      <div>
+        <h3 style="color:var(--gold)">Concluído</h3>
+        <p><span class="check">✓</span>Paleta ROIT aplicada nos tokens CSS</p>
+        <p><span class="check">✓</span>Logo + favicon recoloridos</p>
+        <p><span class="check">✓</span>Cobrand "BY ROIT" no wordmark</p>
+        <p><span class="check">✓</span>Badges + toasts limpos de verde residual</p>
+        <p><span class="check">✓</span>Build + deploy no homelab</p>
+      </div>
+      <div>
+        <h3 style="color:var(--gold)">Sugerido</h3>
+        <p><span class="check">○</span>Update do client desktop Windows com mesma paleta</p>
+        <p><span class="check">○</span>Splash + ícone do instalador <code>vagg-client-setup.exe</code></p>
+        <p><span class="check">○</span>Marketing kit (one-pager / landing) repaginado</p>
+        <p><span class="check">○</span>Documentar no <code>Brand/brand.css</code> os tokens ROIT</p>
+        <p><span class="check">○</span>Code-signing dos exes com cert "ROIT Innovation Hub"</p>
+      </div>
+    </div>
+    <div style="position:absolute; bottom:60px; left:96px;">
+      <span class="wordmark" style="font-size:24px">vagg<span class="dot">.</span></span>
+      <span class="by-roit">ROIT INNOVATION HUB · 2026</span>
+    </div>
+  </section>
+
+</div>
+</body>
+</html>

@@ -2,54 +2,311 @@
 @tailwind components;
 @tailwind utilities;
 
+/*
+ * VAGG · Design System (ROIT brand)
+ *
+ * Paleta ROIT:
+ *   - navy   #14283B   (background, surfaces)
+ *   - gold   #D4A943   (primary accent, "i" dot do logo)
+ *   - sand   #F6F5F1   (paper, light alt)
+ *
+ * Dark by default. Tokens em HSL pra compat com shadcn/Radix.
+ */
+
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
-    --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
-    --primary: 222.2 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
-    --radius: 0.5rem;
+    /* ── ROIT raw tokens (brand book) ── */
+    --roit-navy: #14283b;
+    --roit-navy-2: #1b3148;          /* surface 1 acima do bg */
+    --roit-navy-3: #243b56;          /* surface 2 (popover) */
+    --roit-line: #2d4763;
+    --roit-line-2: #3a5675;
+    --roit-ink: #f1ece1;             /* texto principal (sand-tinted ink) */
+    --roit-ink-2: #c9c2b3;
+    --roit-ink-3: #8b8775;
+    --roit-ink-4: #5a5749;
+    --roit-paper: #f6f5f1;
+    --roit-gold: #d4a943;
+    --roit-gold-2: #b88c2d;
+    --roit-gold-ink: #2a2010;
+    /* Status colors — separados do brand pra clareza UX:
+       gold/cream = brand, success = green, warn = amber, crit = red. */
+    --roit-success: #34c896;       /* tunnels UP, leds ativos, badges OK */
+    --roit-warn: #e0a14a;
+    --roit-crit: #c66d5d;
+
+    /* ── Aliases vagg-* mantidos pra compat com componentes legados ── */
+    --vagg-bg: var(--roit-navy);
+    --vagg-bg-2: var(--roit-navy-2);
+    --vagg-bg-3: var(--roit-navy-3);
+    --vagg-line: var(--roit-line);
+    --vagg-line-2: var(--roit-line-2);
+    --vagg-ink: var(--roit-ink);
+    --vagg-ink-2: var(--roit-ink-2);
+    --vagg-ink-3: var(--roit-ink-3);
+    --vagg-ink-4: var(--roit-ink-4);
+    --vagg-paper: var(--roit-paper);
+    --vagg-signal: var(--roit-gold);
+    --vagg-signal-2: var(--roit-gold-2);
+    --vagg-signal-ink: var(--roit-gold-ink);
+    --vagg-warn: var(--roit-warn);
+    --vagg-crit: var(--roit-crit);
+
+    /* ── shadcn-compat HSL tokens (mapeados pro ROIT dark) ── */
+    --background: 213 50% 16%;         /* navy #14283b */
+    --foreground: 39 26% 91%;          /* ink #f1ece1 */
+
+    --card: 212 45% 19%;               /* navy-2 #1b3148 */
+    --card-foreground: 39 26% 91%;
+
+    --popover: 211 41% 24%;            /* navy-3 #243b56 */
+    --popover-foreground: 39 26% 91%;
+
+    /* Gold como primary (ROIT accent) */
+    --primary: 41 64% 55%;             /* gold #d4a943 */
+    --primary-foreground: 33 50% 11%;  /* gold-ink #2a2010 */
+
+    --secondary: 211 41% 24%;
+    --secondary-foreground: 39 22% 75%;
+
+    --muted: 212 38% 28%;              /* line */
+    --muted-foreground: 41 9% 50%;     /* ink-3 */
+
+    --accent: 211 41% 24%;
+    --accent-foreground: 41 64% 65%;
+
+    --destructive: 8 50% 57%;          /* crit #c66d5d */
+    --destructive-foreground: 0 0% 100%;
+
+    --success: 162 60% 49%;            /* green #34c896 — tunnel UP / running */
+    --warning: 33 70% 58%;             /* warn */
+    --info: 41 64% 55%;                /* gold — info usa brand accent */
+
+    --border: 212 38% 28%;
+    --input: 212 32% 33%;
+    --ring: 41 64% 55%;                /* gold */
+
+    --radius: 8px;
+
+    /* ── Layout-specific (header, sidebar, LEDs) ── */
+    --router-header-bg: var(--roit-navy);
+    --router-header-border: var(--roit-line);
+    --router-header-text: var(--roit-ink);
+    --router-header-muted: var(--roit-ink-3);
+
+    --router-sidebar-bg: var(--roit-navy);
+    --router-sidebar-border: var(--roit-line);
+    /* Sidebar active = gold (brand), LED on = green (status). Distinção
+       deliberada: nav ativa marca brand, LED indica saúde do túnel. */
+    --router-sidebar-active: var(--roit-gold);
+    --router-sidebar-active-bg: rgba(212, 169, 67, 0.10);
+
+    --router-led-on: var(--roit-success);
+    --router-led-warn: var(--roit-warn);
+    --router-led-off: var(--roit-ink-4);
+    --router-led-error: var(--roit-crit);
+
+    --router-shadow-card: 0 1px 0 rgba(255, 255, 255, 0.04) inset,
+      0 1px 2px rgba(0, 0, 0, 0.3);
+    --router-shadow-pop: 0 24px 60px -20px rgba(0, 0, 0, 0.55),
+      0 2px 8px rgba(0, 0, 0, 0.25);
   }
 
-  .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
-    --primary: 210 40% 98%;
-    --primary-foreground: 222.2 47.4% 11.2%;
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 212.7 26.8% 83.9%;
+  /* Force dark color-scheme — browsers ajustam scrollbars e form controls. */
+  html {
+    color-scheme: dark;
   }
 
   * {
     @apply border-border;
   }
+
+  html,
+  body {
+    height: 100%;
+  }
+
   body {
     @apply bg-background text-foreground antialiased;
-    font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI',
-      Roboto, 'Helvetica Neue', sans-serif;
+    font-family: 'Inter', 'Helvetica Neue', Arial, sans-serif;
+    font-size: 14px;
+    text-rendering: optimizeLegibility;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    font-weight: 600;
+    color: hsl(var(--foreground));
+    letter-spacing: -0.01em;
+  }
+
+  /* Display / display-mono nas headings principais — JetBrains Mono. */
+  .display-mono {
+    font-family: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, Consolas,
+      monospace;
+    font-feature-settings: 'ss01', 'cv11';
+    letter-spacing: -0.02em;
+  }
+
+  /* Eyebrow (caption mono uppercase) — usado em headers de seção. */
+  .eyebrow {
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 11px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: hsl(var(--muted-foreground));
+  }
+
+  /* Wordmark "vagg." reutilizável onde quiser texto puro do brand. */
+  .vagg-wordmark {
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    color: hsl(var(--foreground));
+  }
+  .vagg-wordmark .dot {
+    color: var(--vagg-signal);
+  }
+}
+
+@layer components {
+  /* ── LED indicator ── */
+  .router-led {
+    @apply inline-block h-2.5 w-2.5 rounded-full;
+    box-shadow: 0 0 0 2px rgba(11, 13, 16, 0.6);
+  }
+  .router-led--on {
+    background: var(--router-led-on);
+    box-shadow:
+      0 0 0 2px rgba(11, 13, 16, 0.6),
+      0 0 10px var(--router-led-on);
+    animation: router-led-pulse 2.4s ease-in-out infinite;
+  }
+  .router-led--warn {
+    background: var(--router-led-warn);
+  }
+  .router-led--off {
+    background: var(--router-led-off);
+  }
+  .router-led--error {
+    background: var(--router-led-error);
+    box-shadow:
+      0 0 0 2px rgba(11, 13, 16, 0.6),
+      0 0 10px var(--router-led-error);
+  }
+
+  @keyframes router-led-pulse {
+    0%,
+    100% {
+      box-shadow:
+        0 0 0 2px rgba(11, 13, 16, 0.6),
+        0 0 8px var(--router-led-on);
+    }
+    50% {
+      box-shadow:
+        0 0 0 2px rgba(11, 13, 16, 0.6),
+        0 0 16px var(--router-led-on);
+    }
+  }
+
+  /* ── Cards ── */
+  .router-card {
+    @apply rounded-lg border bg-card;
+    box-shadow: var(--router-shadow-card);
+  }
+
+  .router-section-title {
+    @apply mb-1 text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground;
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+  }
+
+  /* ── Tabs ── */
+  .router-tab {
+    @apply relative inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground;
+  }
+  .router-tab[data-active='true'] {
+    color: var(--vagg-signal);
+  }
+  .router-tab[data-active='true']::after {
+    content: '';
+    position: absolute;
+    left: 16px;
+    right: 16px;
+    bottom: 0;
+    height: 2px;
+    background: var(--vagg-signal);
+    border-radius: 2px 2px 0 0;
+  }
+
+  /* ── Status pills ── */
+  .router-pill {
+    @apply inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium;
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    background: var(--vagg-bg-2);
+    border: 1px solid var(--vagg-line);
+    color: var(--vagg-ink-2);
+  }
+  .router-pill--on {
+    color: var(--vagg-signal);
+  }
+  .router-pill--warn {
+    color: var(--vagg-warn);
+  }
+  .router-pill--off {
+    color: var(--vagg-ink-3);
+  }
+  .router-pill--error {
+    color: var(--vagg-crit);
+  }
+
+  /* ── Inputs ── */
+  .router-input {
+    @apply flex h-10 w-full rounded-md border border-input bg-popover px-3 py-2 text-sm transition-colors placeholder:text-muted-foreground focus-visible:border-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 disabled:cursor-not-allowed disabled:opacity-50;
+  }
+
+  /* ── Tables ── */
+  .router-table {
+    @apply w-full text-sm;
+  }
+  .router-table thead th {
+    @apply px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground;
+    background: var(--vagg-bg-3);
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    letter-spacing: 0.1em;
+  }
+  .router-table tbody td {
+    @apply border-b border-border px-4 py-3 align-middle;
+  }
+  .router-table tbody tr:last-child td {
+    @apply border-b-0;
+  }
+  .router-table tbody tr:hover td {
+    background: rgba(52, 200, 150, 0.04);
+  }
+
+  /* ── Switch ── */
+  .router-switch {
+    @apply relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full transition-colors;
+    background: var(--router-led-off);
+  }
+  .router-switch[data-state='on'] {
+    background: var(--vagg-signal);
+  }
+  .router-switch::after {
+    content: '';
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    height: 16px;
+    width: 16px;
+    background: #fff;
+    border-radius: 9999px;
+    transition: transform 0.15s ease;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+  }
+  .router-switch[data-state='on']::after {
+    transform: translateX(16px);
   }
 }
