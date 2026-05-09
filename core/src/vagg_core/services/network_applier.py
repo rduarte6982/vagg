@@ -94,14 +94,31 @@ class NetworkApplier:
     # ----- sysctls -----
 
     async def _apply_sysctls(self, plan: NetworkPlan) -> None:
+        """Aplica sysctls best-effort.
+
+        Tuning, não correção: ``nf_conntrack_max`` etc afetam performance/limit
+        mas o VAGG funciona sem eles. Se o container não tem cap pra escrever
+        (ex: ``nf_conntrack_*`` precisa de SYS_ADMIN, não NET_ADMIN), só logamos
+        warning. O admin do host pode setar via /etc/sysctl.d/ se precisar.
+        """
         for key, value in plan.sysctls:
             current = await self._run(["sysctl", "-n", key])
             if current.returncode == 0 and current.stdout.strip() == value:
                 continue
             res = await self._run(["sysctl", "-w", f"{key}={value}"])
             if res.returncode != 0:
+                stderr = res.stderr.strip()
+                if "permission denied" in stderr.lower():
+                    log.warning(
+                        "network.sysctl.skipped_no_perm",
+                        key=key,
+                        desired=value,
+                        current=current.stdout.strip() if current.returncode == 0 else None,
+                        hint="set via /etc/sysctl.d/99-vagg.conf on the host",
+                    )
+                    continue
                 raise NetworkApplyError(
-                    f"sysctl {key} falhou: {res.stderr.strip()}",
+                    f"sysctl {key} falhou: {stderr}",
                     context={"key": key, "value": value},
                 )
 

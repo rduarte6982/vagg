@@ -93,6 +93,8 @@ async def connect_tunnel(
         config_text=client.config_text,
         username=client.vpn_username,
         password=client.vpn_password,
+        requires_otp=bool(client.requires_otp),
+        saml_cookie=client.saml_cookie,
     )
     status_row = await _ensure_status_row(session, client)
     status_row.state = TunnelState.STARTING
@@ -165,3 +167,40 @@ async def tail_tunnel_logs(
     await _load_client(session, client_id)
     lines = await orchestrator.tail_logs(client_id, lines=tail)
     return LogsOut(client_id=client_id, lines=lines)
+
+
+class DiscoveredRouteOut(BaseModel):
+    cidr: str
+    dev: str
+    gateway: str | None = None
+
+
+class DiscoveryOut(BaseModel):
+    client_id: str
+    routes: list[DiscoveredRouteOut]
+    dns_servers: list[str]
+    search_domains: list[str]
+
+
+@router.get("/discover", response_model=DiscoveryOut)
+async def get_tunnel_discovery(
+    client_id: str,
+    _: Annotated[CurrentAdmin, Depends(require_admin)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+    orchestrator: Annotated[TunnelOrchestratorProtocol, Depends(get_tunnel_orchestrator)],
+) -> DiscoveryOut:
+    """Lê (sem persistir) rotas e DNS empurrados pelo gateway.
+
+    Útil pro admin auditar o que o auto-discovery vai (ou já) gravou. Read-only.
+    """
+    await _load_client(session, client_id)
+    report = await orchestrator.discover(client_id)
+    return DiscoveryOut(
+        client_id=client_id,
+        routes=[
+            DiscoveredRouteOut(cidr=r.cidr, dev=r.dev, gateway=r.gateway)
+            for r in report.routes
+        ],
+        dns_servers=list(report.dns_servers),
+        search_domains=list(report.search_domains),
+    )

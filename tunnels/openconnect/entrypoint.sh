@@ -17,6 +17,10 @@ log() { echo "{\"ts\":\"$(date -u +%FT%TZ)\",\"src\":\"entrypoint\",\"msg\":\"$*
 [ -e /dev/net/tun ] || { log "FATAL /dev/net/tun missing"; exit 1; }
 [ -f "$TUNNEL_CONFIG_PATH" ] || { log "FATAL TUNNEL_CONFIG_PATH=$TUNNEL_CONFIG_PATH not found"; exit 1; }
 
+# Snapshot das tunnel ifaces pré-existentes (network_mode=host expõe ifaces
+# de outros tunnels — auto-discovery precisa filtrar).
+ip -j link show 2>/dev/null > /run/tunnel-iface-snapshot.json || echo '[]' > /run/tunnel-iface-snapshot.json
+
 # Endpoint: respeitar formato canônico ``server <host>`` ou usar o arquivo bruto.
 SERVER=$(grep -E '^[[:space:]]*server[[:space:]=]' "$TUNNEL_CONFIG_PATH" \
     | head -1 \
@@ -38,6 +42,13 @@ if [ -n "${TUNNEL_DEV:-}" ]; then
     iface_args="--interface $TUNNEL_DEV"
 fi
 
+# Protocolo: orchestrator passa TUNNEL_PROTOCOL=gp para GlobalProtect, etc.
+# Sem isso openconnect default = anyconnect e falha em gateways GP/Pulse/F5.
+proto_arg=""
+if [ -n "${TUNNEL_PROTOCOL:-}" ]; then
+    proto_arg="--protocol=$TUNNEL_PROTOCOL"
+fi
+
 # Lê senha do arquivo (mode 600 esperado), via --passwd-on-stdin.
 password=""
 if [ -f "$TUNNEL_PASSWORD_FILE" ]; then
@@ -47,6 +58,7 @@ fi
 # Spawna openconnect em background; --background grava o pid no --pid-file.
 log "starting openconnect (pid-file=$TUNNEL_PID_FILE)"
 printf '%s\n' "$password" | openconnect \
+    $proto_arg \
     --user "${TUNNEL_USERNAME:-}" \
     --passwd-on-stdin \
     --pid-file "$TUNNEL_PID_FILE" \

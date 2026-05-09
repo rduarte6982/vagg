@@ -108,6 +108,22 @@ class TestSysctls:
         with pytest.raises(NetworkApplyError):
             await a.apply(plan)
 
+    async def test_permission_denied_is_soft_fail(
+        self, applier: tuple[NetworkApplier, FakeRunner]
+    ) -> None:
+        """nf_conntrack_max requer SYS_ADMIN; com NET_ADMIN só, sysctl -w
+        retorna 'permission denied'. Aplicar continua normal — só loga warning,
+        já que sysctls são tuning, não correção."""
+        a, runner = applier
+        runner.respond_to(lambda argv: argv[:2] == ["sysctl", "-n"], CommandResult(0, "0\n", ""))
+        runner.respond_to(
+            lambda argv: argv[:2] == ["sysctl", "-w"],
+            CommandResult(255, "", "sysctl: permission denied on key \"net.netfilter.nf_conntrack_max\""),
+        )
+        plan = build_plan(virtual_range="10.200.0.0/16", clients=[])
+        # Não levanta — a sequência inteira (iptables, rules, routes) segue.
+        await a.apply(plan)
+
 
 class TestRtTables:
     async def test_writes_entries_to_disk(self, applier: tuple[NetworkApplier, FakeRunner]) -> None:

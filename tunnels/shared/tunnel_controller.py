@@ -158,7 +158,13 @@ class OpenVPNManager:
 
 
 class _ProcessFifoManager:
-    """Shared base: state from PID liveness, OTP via FIFO, signal via os.kill."""
+    """Shared base: state from PID liveness, OTP via FIFO, signal via os.kill.
+
+    Importante: PID vivo NÃO significa "connected" — openfortivpn/openconnect
+    com ``--persistent`` ficam vivos mesmo em auth-fail loop. Pra reportar
+    "connected" exigimos também que exista uma iface de tunnel (tun*/ppp*/etc),
+    que só aparece DEPOIS da auth bem-sucedida. Sem iface → "starting".
+    """
 
     def __init__(self, *, pid_file: str, otp_pipe: str | None) -> None:
         self._pid_file = pid_file
@@ -171,7 +177,14 @@ class _ProcessFifoManager:
         return "connected" if _process_alive(pid) else "down"
 
     async def query_state(self) -> dict[str, Any]:
-        return {"state": self._state_from_pid()}
+        base = self._state_from_pid()
+        if base != "connected":
+            return {"state": base}
+        # PID vivo não basta — confirma que a iface tun*/ppp* subiu.
+        if await _has_tunnel_iface():
+            return {"state": "connected"}
+        # Processo vivo sem iface = ainda em auth/handshake (ou loop fail).
+        return {"state": "starting"}
 
     async def signal(self, sig: str) -> None:
         pid = _read_pid_file(self._pid_file)
@@ -288,6 +301,186 @@ class StrongSwanManager:
 
 
 # ============================================================
+# Auto-discovery of routes / DNS pushed by the gateway
+# ============================================================
+
+
+# Iface name prefixes que consideramos "do túnel" — qualquer rota saindo
+# por essas devices é candidata a virar nat_mapping. Inclui:
+#   tun*  — openfortivpn, openconnect (modo PPP), wireguard quando configurada
+#   ppp*  — openfortivpn (default), pppd-based
+#   gpd*  — GlobalProtect dedicated daemon iface (raro)
+#   wg*   — WireGuard padrão wg-quick
+#   tap*  — OpenVPN modo bridge
+_TUNNEL_IFACE_PREFIXES = ("tun", "ppp", "gpd", "wg", "tap")
+
+# Path em que o entrypoint grava as tunnel ifaces visíveis no host net
+# namespace ANTES de subir o VPN binary. Usado pra filtrar ifaces criadas
+# por OUTROS tunnel containers (vagg roda com network_mode=host, todos
+# compartilham o mesmo namespace).
+_PREEXISTING_IFACES_PATH = "/run/tunnel-iface-snapshot.json"
+
+
+def _is_tunnel_dev(dev: str | None) -> bool:
+    if not dev:
+        return False
+    return dev.startswith(_TUNNEL_IFACE_PREFIXES)
+
+
+def _load_preexisting_ifaces(path: str | None = None) -> set[str]:
+    """Lê o snapshot do entrypoint e retorna o conjunto de ifaces que JÁ
+    existiam quando o tunnel container subiu.
+
+    Sem o arquivo (ex: container antigo rodando), retorna conjunto vazio →
+    fallback comportamental: aceita qualquer iface tunnel (broken antigo,
+    mas seguro contra crash). O fix real depende do entrypoint atualizado.
+    """
+    # Lookup do módulo em runtime pra que tests possam patch _PREEXISTING_IFACES_PATH.
+    target = path if path is not None else _PREEXISTING_IFACES_PATH
+    try:
+        with open(target, encoding="utf-8") as f:
+            raw = json.loads(f.read() or "[]")
+    except (OSError, json.JSONDecodeError):
+        return set()
+    if not isinstance(raw, list):
+        return set()
+    out: set[str] = set()
+    for entry in raw:
+        if not isinstance(entry, dict):
+            continue
+        name = entry.get("ifname")
+        if isinstance(name, str) and name.startswith(_TUNNEL_IFACE_PREFIXES):
+            out.add(name)
+    return out
+
+
+async def _has_tunnel_iface() -> bool:
+    """True se existe iface tun*/ppp*/wg*/gpd*/tap* criada por ESTE container.
+
+    Filtra ifaces pré-existentes (de outros tunnels rodando no mesmo host
+    net namespace) usando o snapshot gravado pelo entrypoint. Sem snapshot,
+    cai pra "qualquer iface tunnel conta" (compat).
+
+    Usado pra distinguir VPN com auth bem-sucedida (iface NOVA existe) de
+    processo vivo em auth-fail loop (sem iface nova).
+    """
+    preexisting = _load_preexisting_ifaces()
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            "ip", "-j", "link", "show",
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        stdout_bytes, _ = await proc.communicate()
+        if proc.returncode != 0:
+            return False
+        raw = json.loads(stdout_bytes.decode("utf-8", errors="replace"))
+    except (OSError, json.JSONDecodeError):
+        return False
+    if not isinstance(raw, list):
+        return False
+    for entry in raw:
+        if not isinstance(entry, dict):
+            continue
+        name = entry.get("ifname")
+        if not isinstance(name, str):
+            continue
+        if not name.startswith(_TUNNEL_IFACE_PREFIXES):
+            continue
+        if name in preexisting:
+            continue  # iface de outro tunnel container
+        return True
+    return False
+
+
+async def _discover_routes() -> list[dict[str, Any]]:
+    """Parse ``ip -j route show`` and return tunnel-bound routes criadas
+    por ESTE container.
+
+    Filtra rotas via ifaces pré-existentes (de outros tunnels no mesmo host
+    net namespace, já que vagg usa network_mode=host) usando o snapshot
+    gravado pelo entrypoint antes do VPN binary subir.
+
+    Returns a list of dicts shaped like::
+
+        {"cidr": "10.80.0.0/16", "dev": "ppp0", "gateway": "10.0.200.1"}
+
+    Default routes (0.0.0.0/0 / ::/0) são filtradas — pertencem ao host.
+    Rotas via ifaces non-tunnel (eth0/lo/br-*) e via ifaces que JÁ existiam
+    quando o container subiu também são filtradas.
+    """
+    preexisting = _load_preexisting_ifaces()
+    proc = await asyncio.create_subprocess_exec(
+        "ip",
+        "-j",
+        "route",
+        "show",
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
+    )
+    stdout_bytes, _ = await proc.communicate()
+    if proc.returncode != 0:
+        return []
+    try:
+        raw = json.loads(stdout_bytes.decode("utf-8", errors="replace"))
+    except json.JSONDecodeError:
+        return []
+    if not isinstance(raw, list):
+        return []
+
+    out: list[dict[str, Any]] = []
+    for entry in raw:
+        if not isinstance(entry, dict):
+            continue
+        dst = entry.get("dst")
+        dev = entry.get("dev")
+        if dst in (None, "default"):
+            continue
+        if not _is_tunnel_dev(dev):
+            continue
+        if dev in preexisting:
+            continue  # rota de outro tunnel container
+        # ``ip -j`` omite o /32 quando o destino é host único; normaliza.
+        cidr = dst if "/" in dst else f"{dst}/32"
+        out.append(
+            {
+                "cidr": cidr,
+                "dev": dev,
+                "gateway": entry.get("gateway"),
+            }
+        )
+    return out
+
+
+def _read_resolv_conf(path: str) -> tuple[list[str], list[str]]:
+    """Return ``(nameservers, search_domains)`` from ``/etc/resolv.conf``.
+
+    Empty lists when the file is missing or unreadable. Comments (``#``,
+    ``;``) and blank lines are skipped. Multiple ``search`` entries collapse
+    into one list (last write wins per resolv.conf semantics).
+    """
+    nameservers: list[str] = []
+    search: list[str] = []
+    try:
+        with open(path, encoding="utf-8") as f:
+            for raw_line in f:
+                line = raw_line.strip()
+                if not line or line.startswith(("#", ";")):
+                    continue
+                parts = line.split()
+                if not parts:
+                    continue
+                key = parts[0].lower()
+                if key == "nameserver" and len(parts) >= 2:
+                    nameservers.append(parts[1])
+                elif key == "search" and len(parts) >= 2:
+                    search = parts[1:]
+    except OSError:
+        return [], []
+    return nameservers, search
+
+
+# ============================================================
 # Controller (protocol-agnostic)
 # ============================================================
 
@@ -307,6 +500,8 @@ class TunnelController:
             return await self._restart()
         if cmd == "otp":
             return await self._otp(msg)
+        if cmd == "discover":
+            return await self._discover()
         return {"ok": False, "error": "unknown_cmd", "cmd": cmd}
 
     async def _status(self) -> dict[str, Any]:
@@ -337,6 +532,24 @@ class TunnelController:
         except OSError as exc:
             return {"ok": False, "error": str(exc)}
         return {"ok": True}
+
+    async def _discover(self) -> dict[str, Any]:
+        """Auto-discover routes + DNS pushed by the gateway.
+
+        Runs ``ip -j route`` inside the container, filters routes whose
+        device looks like a tunnel iface (tun*/ppp*/gpd*/wg*), and reads
+        /etc/resolv.conf for nameservers. Caller (orchestrator on the
+        host) uses this to seed nat_mappings + dns_server without manual
+        config.
+        """
+        routes = await _discover_routes()
+        dns_servers, search_domains = _read_resolv_conf("/etc/resolv.conf")
+        return {
+            "ok": True,
+            "routes": routes,
+            "dns_servers": dns_servers,
+            "search_domains": search_domains,
+        }
 
 
 # ============================================================
@@ -377,7 +590,10 @@ async def _serve(controller: TunnelController, control_socket: str) -> asyncio.A
     server: asyncio.AbstractServer = await asyncio.start_unix_server(  # type: ignore[attr-defined,unused-ignore]
         _client_handler, path=str(socket_path)
     )
-    socket_path.chmod(0o660)  # noqa: ASYNC240 — startup only
+    # 0o666 ao invés de 0o660 porque o tunnel-controller roda como root no
+    # container e o core conecta como uid 1000 — sem world-write, o status
+    # check falha com EACCES. Em produção (mesmo user-ns), trocar pra 0o660.
+    socket_path.chmod(0o666)  # noqa: ASYNC240 — startup only
     return server
 
 

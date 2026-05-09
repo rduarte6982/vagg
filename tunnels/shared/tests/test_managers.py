@@ -48,13 +48,24 @@ class TestProcessFifoManagers:
         assert (await m.query_state()) == {"state": "unknown"}
 
     @pytest.mark.parametrize("manager_cls", [tc.OpenConnectManager, tc.OpenFortiVPNManager])
-    async def test_query_state_connected_when_process_alive(
+    async def test_query_state_connected_when_process_alive_and_iface_up(
         self, tmp_path: Path, manager_cls: type
     ) -> None:
         # Use the test process's own PID — it's definitely alive.
         pid_file = _write_pid_file(tmp_path, os.getpid())
         m = manager_cls(pid_file=str(pid_file), otp_pipe=None)
-        assert (await m.query_state()) == {"state": "connected"}
+        with patch("tunnel_controller._has_tunnel_iface", AsyncMock(return_value=True)):
+            assert (await m.query_state()) == {"state": "connected"}
+
+    @pytest.mark.parametrize("manager_cls", [tc.OpenConnectManager, tc.OpenFortiVPNManager])
+    async def test_query_state_starting_when_alive_but_no_iface(
+        self, tmp_path: Path, manager_cls: type
+    ) -> None:
+        """PID vivo SEM iface tun*/ppp* = ainda em handshake/auth-fail loop."""
+        pid_file = _write_pid_file(tmp_path, os.getpid())
+        m = manager_cls(pid_file=str(pid_file), otp_pipe=None)
+        with patch("tunnel_controller._has_tunnel_iface", AsyncMock(return_value=False)):
+            assert (await m.query_state()) == {"state": "starting"}
 
     @pytest.mark.parametrize("manager_cls", [tc.OpenConnectManager, tc.OpenFortiVPNManager])
     async def test_query_state_down_when_pid_dead(self, tmp_path: Path, manager_cls: type) -> None:

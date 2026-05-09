@@ -14,6 +14,10 @@ log() { echo "{\"ts\":\"$(date -u +%FT%TZ)\",\"src\":\"entrypoint\",\"msg\":\"$*
 [ -e /dev/net/tun ] || { log "FATAL /dev/net/tun missing — run with --device=/dev/net/tun"; exit 1; }
 [ -f "$TUNNEL_CONFIG_PATH" ] || { log "FATAL TUNNEL_CONFIG_PATH=$TUNNEL_CONFIG_PATH not found"; exit 1; }
 
+# Snapshot das tunnel ifaces pré-existentes (network_mode=host expõe ifaces
+# de outros tunnels — auto-discovery precisa filtrar).
+ip -j link show 2>/dev/null > /run/tunnel-iface-snapshot.json || echo '[]' > /run/tunnel-iface-snapshot.json
+
 mkdir -p "$(dirname "$TUNNEL_CONTROL_SOCKET")"
 
 # Build auth-user-pass file when credentials are mounted as files.

@@ -4,13 +4,14 @@ from __future__ import annotations
 
 from pathlib import Path
 from typing import Any
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from aiodocker.exceptions import DockerError
 
 from vagg_core.db.models import TunnelState, VpnType
 from vagg_core.services.tunnel_orchestrator import (
+    DiscoveryReport,
     TunnelOrchestrationError,
     TunnelOrchestrator,
 )
@@ -191,3 +192,70 @@ class TestSendOtp:
         with pytest.raises(Exception) as info:  # noqa: PT011
             await orch.send_otp("xpto", "123456")
         assert info.value.status_code == 404  # type: ignore[attr-defined]
+
+
+class TestDiscover:
+    async def test_no_socket_returns_empty(self, tmp_path: Path) -> None:
+        orch, _ = _make_orchestrator(tmp_path)
+        report = await orch.discover("xpto")
+        assert report.is_empty()
+
+    async def test_parses_controller_response(self, tmp_path: Path) -> None:
+        orch, _ = _make_orchestrator(tmp_path)
+        # Faz o socket existir pra passar do guard inicial.
+        sock_dir = orch._client_socket_dir("longping")
+        sock_dir.mkdir(parents=True, exist_ok=True)
+        (sock_dir / "control.sock").touch()
+
+        async def fake_talk(_path: Path, _msg: dict[str, Any]) -> dict[str, Any]:
+            return {
+                "ok": True,
+                "routes": [
+                    {"cidr": "10.80.0.0/16", "dev": "ppp0", "gateway": "10.0.200.1"},
+                    {"cidr": "10.123.55.10/32", "dev": "ppp0", "gateway": None},
+                ],
+                "dns_servers": ["10.0.50.10"],
+                "search_domains": ["lpht.com.br"],
+            }
+
+        with patch.object(orch, "_talk_to_controller", side_effect=fake_talk):
+            report = await orch.discover("longping")
+
+        assert len(report.routes) == 2
+        assert {r.cidr for r in report.routes} == {"10.80.0.0/16", "10.123.55.10/32"}
+        assert report.dns_servers == ("10.0.50.10",)
+        assert report.search_domains == ("lpht.com.br",)
+
+    async def test_controller_error_returns_empty(self, tmp_path: Path) -> None:
+        orch, _ = _make_orchestrator(tmp_path)
+        sock_dir = orch._client_socket_dir("xpto")
+        sock_dir.mkdir(parents=True, exist_ok=True)
+        (sock_dir / "control.sock").touch()
+
+        with patch.object(orch, "_talk_to_controller", side_effect=TimeoutError):
+            report = await orch.discover("xpto")
+        assert report.is_empty()
+
+    async def test_discards_invalid_route_entries(self, tmp_path: Path) -> None:
+        orch, _ = _make_orchestrator(tmp_path)
+        sock_dir = orch._client_socket_dir("xpto")
+        sock_dir.mkdir(parents=True, exist_ok=True)
+        (sock_dir / "control.sock").touch()
+
+        async def fake_talk(_path: Path, _msg: dict[str, Any]) -> dict[str, Any]:
+            return {
+                "ok": True,
+                "routes": [
+                    {"cidr": "10.0.0.0/8", "dev": "tun0"},
+                    "garbage",
+                    {"cidr": None, "dev": "tun0"},  # filtrado
+                    {"dev": "tun0"},                  # sem cidr
+                ],
+                "dns_servers": ["1.1.1.1", 42],     # int filtrado
+                "search_domains": [],
+            }
+
+        with patch.object(orch, "_talk_to_controller", side_effect=fake_talk):
+            report = await orch.discover("xpto")
+        assert [r.cidr for r in report.routes] == ["10.0.0.0/8"]
+        assert report.dns_servers == ("1.1.1.1",)

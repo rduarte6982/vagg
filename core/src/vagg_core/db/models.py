@@ -35,10 +35,11 @@ class Base(DeclarativeBase):
 
 class VpnType(enum.StrEnum):
     OPENVPN = "openvpn"
-    OPENCONNECT = "openconnect"
+    OPENCONNECT = "openconnect"  # Cisco AnyConnect (default openconnect)
     OPENFORTIVPN = "openfortivpn"
     WIREGUARD = "wireguard"
     STRONGSWAN = "strongswan"
+    GLOBALPROTECT = "globalprotect"  # Palo Alto, via openconnect --protocol=gp
 
 
 class TunnelState(enum.StrEnum):
@@ -88,6 +89,30 @@ class Client(Base):
     config_text: Mapped[str | None] = mapped_column(Text(), nullable=True)
     vpn_username: Mapped[str | None] = mapped_column(String(128), nullable=True)
     vpn_password: Mapped[str | None] = mapped_column(String(256), nullable=True)
+    # Quando True, o connect fica aguardando POST /tunnels/{id}/otp com o
+    # código do app autenticador (Microsoft Authenticator, Google Auth, etc).
+    # O orchestrator empurra o código via FIFO pro stdin do client VPN.
+    requires_otp: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    # Método de autenticação: 'none' (só user/senha), 'otp' (MFA push) ou
+    # 'saml' (SSO via browser - Microsoft / Google / Okta etc).
+    # Source of truth pra UI; requires_otp e saml_cookie são derivados.
+    auth_method: Mapped[str] = mapped_column(String(16), nullable=False, default="none")
+    # Auth via SAML/SSO (típico em GlobalProtect com Azure AD). O cookie é
+    # capturado num browser remoto (vagg-saml-portal container) e salvo aqui.
+    # Quando setado, o tunnel container ignora user/password e usa o cookie.
+    saml_cookie: Mapped[str | None] = mapped_column(Text, nullable=True)
+    saml_cookie_expires_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    # Auto-discovery: na primeira vez que o tunnel transiciona pra UP, o worker
+    # roda `ip route` + lê /etc/resolv.conf dentro do container e popula
+    # nat_mappings + dns_server. Desliga este flag pra fixar mappings manuais.
+    auto_discovery_enabled: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=True, server_default="1"
+    )
+    auto_discovered_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )
@@ -190,7 +215,11 @@ class Consultant(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     email: Mapped[str] = mapped_column(String(254), nullable=False, unique=True)
     name: Mapped[str] = mapped_column(String(128), nullable=False)
-    # Maps to OpenVPN identity (SPEC §7.2 option B: static IP mapping).
+    # argon2id hash da senha do usuário pra autenticação no VAGG Client.
+    # Pode ser NULL pra usuários antigos importados antes da feature de senha;
+    # nesses casos o admin precisa setar a senha via /api/v1/consultants/{id}/password.
+    password_hash: Mapped[str | None] = mapped_column(String(256), nullable=True)
+    # Campos legados de mapeamento OpenVPN — mantidos pra compat.
     openvpn_username: Mapped[str | None] = mapped_column(String(128), nullable=True, unique=True)
     static_pool_ip: Mapped[str | None] = mapped_column(String(45), nullable=True, unique=True)
     role: Mapped[str] = mapped_column(String(16), nullable=False, default="viewer")

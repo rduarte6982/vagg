@@ -15,7 +15,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
 from vagg_core import __version__
-from vagg_core.api.v1 import audit, auth, clients, consultants, policies, system, tunnels
+from vagg_core.api.v1 import audit, auth, clients, consultants, me, policies, system, tunnels
 from vagg_core.config import Settings, get_settings
 from vagg_core.core.errors import CoreError
 from vagg_core.core.logging import configure_logging, get_logger
@@ -115,6 +115,8 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         session_factory=app.state.session_factory,
         orchestrator=app.state.tunnel_orchestrator,
         interval_s=settings.tunnels_health_interval_s,
+        network_manager=network_manager,
+        dns_manager=dns_manager,
     )
     app.state.tunnel_health_worker = health_worker
     if settings.tunnels_health_enabled:
@@ -154,6 +156,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(policies.router)
     app.include_router(tunnels.router)
     app.include_router(audit.router)
+    app.include_router(me.router)
     app.include_router(portal_admin_router)
     app.include_router(portal_router)
 

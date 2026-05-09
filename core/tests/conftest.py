@@ -26,6 +26,7 @@ from vagg_core.db.session import make_engine, make_session_factory
 from vagg_core.main import create_app
 from vagg_core.services.dns_manager import _NoopDnsManager
 from vagg_core.services.tunnel_orchestrator import (
+    DiscoveryReport,
     TunnelStatusReport,
 )
 
@@ -71,6 +72,7 @@ class FakeTunnelOrchestrator:
         self.status_overrides: dict[str, TunnelStatusReport] = {}
         self.fail_otp_for: set[str] = set()
         self.logs: dict[str, list[str]] = {}
+        self.discovery_overrides: dict[str, DiscoveryReport] = {}
 
     async def connect(
         self,
@@ -80,6 +82,8 @@ class FakeTunnelOrchestrator:
         config_text: str,
         username: str | None = None,
         password: str | None = None,
+        requires_otp: bool = False,
+        saml_cookie: str | None = None,
     ) -> str:
         self._next_container_id += 1
         container_id = f"fake-container-{self._next_container_id}"
@@ -123,6 +127,41 @@ class FakeTunnelOrchestrator:
     async def tail_logs(self, client_id: str, *, lines: int = 100) -> list[str]:
         self.calls.append(("tail_logs", {"client_id": client_id, "lines": lines}))
         return self.logs.get(client_id, [])
+
+    async def start_saml_portal(
+        self, *, client_id: str, gateway_url: str, kind: str = "gp"
+    ):
+        from vagg_core.services.tunnel_orchestrator import SamlPortalSession
+        from datetime import UTC, datetime, timedelta
+
+        self.calls.append(
+            (
+                "start_saml_portal",
+                {"client_id": client_id, "gateway_url": gateway_url, "kind": kind},
+            )
+        )
+        return SamlPortalSession(
+            client_id=client_id,
+            container_id=f"fake-saml-{client_id}",
+            portal_url=f"http://test.local:14500/{client_id}",
+            expires_at=datetime.now(UTC) + timedelta(minutes=20),
+        )
+
+    async def poll_saml_cookie(self, client_id: str):
+        from vagg_core.services.tunnel_orchestrator import SamlPollResult
+
+        self.calls.append(("poll_saml_cookie", {"client_id": client_id}))
+        return SamlPollResult(captured=False)
+
+    async def stop_saml_portal(self, client_id: str) -> None:
+        self.calls.append(("stop_saml_portal", {"client_id": client_id}))
+
+    async def discover(self, client_id: str) -> DiscoveryReport:
+        self.calls.append(("discover", {"client_id": client_id}))
+        return self.discovery_overrides.get(
+            client_id,
+            DiscoveryReport(routes=(), dns_servers=(), search_domains=()),
+        )
 
 
 @pytest.fixture
