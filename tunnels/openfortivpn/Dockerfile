@@ -6,18 +6,20 @@
 #   docker build -f tunnels/openfortivpn/Dockerfile \
 #                -t vagg/tunnel-openfortivpn:dev tunnels/
 #
-FROM alpine:3.20
+# Por que Debian 12: Alpine removeu o pacote ``openfortivpn`` dos repos em
+# 2026 (3.20+). Debian mantém o pacote via apt e tem suporte estável.
+FROM debian:12-slim
 
-RUN apk add --no-cache \
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
         openfortivpn \
         iproute2 \
         python3 \
-    && rm -rf /var/cache/apk/*
+        openssl \
+        ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
 
-RUN addgroup -S vagg \
-    && adduser -S -G vagg -h /home/vagg vagg \
-    && mkdir -p /var/run/vagg /run \
-    && chown -R vagg:vagg /var/run/vagg /run
+RUN mkdir -p /var/run/vagg /run
 
 COPY --chmod=0755 shared/tunnel_controller.py    /usr/local/bin/tunnel-controller
 COPY --chmod=0755 openfortivpn/entrypoint.sh     /usr/local/bin/entrypoint
@@ -31,5 +33,6 @@ ENV TUNNEL_CONFIG_PATH=/config/tunnel.conf \
     TUNNEL_LOG_LEVEL=INFO
 
 VOLUME ["/config", "/var/run/vagg"]
-USER vagg
+# Roda como root porque openfortivpn precisa de privilégio pra pppd/route.
+# A cap NET_ADMIN do compose ainda é o gate principal de segurança.
 ENTRYPOINT ["/usr/local/bin/entrypoint"]
