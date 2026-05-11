@@ -150,6 +150,8 @@ class TunnelOrchestratorProtocol(Protocol):
 
     async def discover(self, client_id: str) -> "DiscoveryReport": ...
 
+    async def saml_seen_cookies(self, client_id: str, *, limit: int = 200) -> list[dict[str, Any]]: ...
+
 
 class TunnelOrchestrator:
     """Concrete orchestrator backed by a real Docker daemon."""
@@ -853,6 +855,33 @@ class TunnelOrchestrator:
                 self._saml_container_name(client_id)
             )
             await container.delete(force=True)
+
+    async def saml_seen_cookies(
+        self, client_id: str, *, limit: int = 200
+    ) -> list[dict[str, Any]]:
+        """Lê o log /share/cookies-seen.log gerado pelo cookie_addon do
+        saml-portal. Útil pra debug quando auto-capture falha — admin pode
+        ver QUAIS nomes de cookie o gateway setou e usar isso pra paste manual.
+
+        Retorna até `limit` entradas mais recentes (JSONL parsed) ou lista
+        vazia se o portal nunca rodou ou nada foi visto.
+        """
+        share_dir = self._client_socket_dir(client_id).parent / f"saml-{client_id}"
+        log_file = share_dir / "cookies-seen.log"
+        if not log_file.exists():
+            return []
+        try:
+            raw = log_file.read_text(encoding="utf-8")
+        except OSError:
+            return []
+        entries: list[dict[str, Any]] = []
+        for line in raw.splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            with contextlib.suppress(json.JSONDecodeError):
+                entries.append(json.loads(line))
+        return entries[-limit:]
 
 
 def default_image_map(tag: str = "dev") -> dict[VpnType, str]:

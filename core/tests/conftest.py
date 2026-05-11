@@ -73,6 +73,7 @@ class FakeTunnelOrchestrator:
         self.fail_otp_for: set[str] = set()
         self.logs: dict[str, list[str]] = {}
         self.discovery_overrides: dict[str, DiscoveryReport] = {}
+        self.saml_seen_overrides: dict[str, list[dict]] = {}
 
     async def connect(
         self,
@@ -162,6 +163,10 @@ class FakeTunnelOrchestrator:
             client_id,
             DiscoveryReport(routes=(), dns_servers=(), search_domains=()),
         )
+
+    async def saml_seen_cookies(self, client_id: str, *, limit: int = 200):
+        self.calls.append(("saml_seen_cookies", {"client_id": client_id, "limit": limit}))
+        return self.saml_seen_overrides.get(client_id, [])
 
 
 @pytest.fixture

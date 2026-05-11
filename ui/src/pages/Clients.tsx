@@ -327,6 +327,59 @@ export function ClientsPage() {
   >('idle');
   const [samlConnectError, setSamlConnectError] = useState<string | null>(null);
 
+  // Manual paste fallback — quando auto-capture falha (cert pinning, IdP
+  // exótico, cookies HttpOnly em memory-only, etc), admin pode colar
+  // cookie capturado no browser próprio dele via DevTools.
+  const [samlTab, setSamlTab] = useState<'auto' | 'manual'>('auto');
+  const [samlPasteValue, setSamlPasteValue] = useState('');
+  const [samlPasteBusy, setSamlPasteBusy] = useState(false);
+  const [samlSeenCookies, setSamlSeenCookies] = useState<
+    Array<{ name: string; in_watchlist: boolean }>
+  >([]);
+
+  const applyPastedCookie = async () => {
+    if (!samlConnectFor || !samlPasteValue.trim()) return;
+    setSamlPasteBusy(true);
+    try {
+      const r = await Saml.pasteCookie(samlConnectFor.id, samlPasteValue.trim());
+      toast.success(
+        'Cookie aplicado',
+        `${r.cookie_name} (${r.cookie_value_len} chars, formato: ${r.detected_format})`,
+      );
+      // Conecta automaticamente após paste bem-sucedido
+      await Tunnels.connect(samlConnectFor.id);
+      toast.info(
+        'Conectando',
+        `Túnel "${samlConnectFor.id}" iniciando com cookie pasted.`,
+      );
+      closeSamlConnect();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      toast.error('Falha ao aplicar cookie', msg);
+    } finally {
+      setSamlPasteBusy(false);
+    }
+  };
+
+  const loadSeenCookies = async () => {
+    if (!samlConnectFor) return;
+    try {
+      const r = await Saml.seenCookies(samlConnectFor.id);
+      const unique = new Map<string, boolean>();
+      for (const e of r.entries) {
+        for (const c of e.cookies) unique.set(c.name, !!c.in_watchlist);
+      }
+      setSamlSeenCookies(
+        Array.from(unique.entries()).map(([name, in_watchlist]) => ({
+          name,
+          in_watchlist,
+        })),
+      );
+    } catch {
+      setSamlSeenCookies([]);
+    }
+  };
+
   const startSamlPortal = async (c: Client) => {
     setSamlConnectFor(c);
     setSamlPortalUrl(null);
@@ -1648,65 +1701,189 @@ export function ClientsPage() {
           if (!samlConnectBusy) closeSamlConnect();
         }}
         title={samlConnectFor ? `Conectar ${samlConnectFor.name} · SSO` : ''}
-        description="Faça login Microsoft no painel abaixo. O cookie é capturado automaticamente e o túnel sobe sozinho."
+        description="Auto-capture pelo browser remoto OU paste manual quando o automático falhar."
         size="xl"
         footer={
           <>
-            <Button variant="outline" onClick={closeSamlConnect} disabled={samlConnectBusy}>
+            <Button variant="outline" onClick={closeSamlConnect} disabled={samlConnectBusy || samlPasteBusy}>
               {samlConnectStatus === 'captured' ? 'Fechar' : 'Cancelar'}
             </Button>
           </>
         }
       >
         <div className="space-y-3">
-          <div className="rounded-md border border-border bg-popover px-3 py-2 text-[11px] text-muted-foreground">
-            {samlConnectStatus === 'starting' && (
-              <span className="inline-flex items-center gap-1.5">
-                <Loader2 size={12} className="animate-spin" /> subindo browser remoto…
-              </span>
-            )}
-            {samlConnectStatus === 'waiting' && (
-              <span className="inline-flex items-center gap-1.5">
-                <Loader2 size={12} className="animate-spin" />
-                aguardando login Microsoft (cookie será capturado automaticamente)
-              </span>
-            )}
-            {samlConnectStatus === 'captured' && (
-              <span className="text-[oklch(72%_0.16_160)]">
-                ✓ cookie capturado — túnel iniciando
-              </span>
-            )}
-            {samlConnectStatus === 'error' && (
-              <span className="text-[oklch(70%_0.18_25)]">
-                ✗ {samlConnectError ?? 'erro desconhecido'}
-              </span>
-            )}
+          {/* Tabs Auto / Manual */}
+          <div className="flex gap-1 border-b border-border">
+            <button
+              type="button"
+              onClick={() => setSamlTab('auto')}
+              className={`px-3 py-1.5 text-sm font-medium transition-colors ${
+                samlTab === 'auto'
+                  ? 'border-b-2 border-primary text-foreground'
+                  : 'text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              Automático
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setSamlTab('manual');
+                void loadSeenCookies();
+              }}
+              className={`px-3 py-1.5 text-sm font-medium transition-colors ${
+                samlTab === 'manual'
+                  ? 'border-b-2 border-primary text-foreground'
+                  : 'text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              Colar cookie manualmente
+            </button>
           </div>
 
-          <div
-            className="overflow-hidden rounded-md border border-border bg-black"
-            style={{ aspectRatio: '16 / 10', minHeight: 460 }}
-          >
-            {samlPortalUrl ? (
-              <iframe
-                src={samlPortalUrl}
-                title="VAGG SAML Portal"
-                className="h-full w-full"
-                style={{ border: 'none' }}
-                allow="clipboard-read; clipboard-write"
-              />
-            ) : (
-              <div className="flex h-full w-full items-center justify-center text-sm text-muted-foreground">
-                {samlConnectStatus === 'starting' ? 'preparando portal…' : '—'}
+          {samlTab === 'auto' && (
+            <>
+              <div className="rounded-md border border-border bg-popover px-3 py-2 text-[11px] text-muted-foreground">
+                {samlConnectStatus === 'starting' && (
+                  <span className="inline-flex items-center gap-1.5">
+                    <Loader2 size={12} className="animate-spin" /> subindo browser remoto…
+                  </span>
+                )}
+                {samlConnectStatus === 'waiting' && (
+                  <span className="inline-flex items-center gap-1.5">
+                    <Loader2 size={12} className="animate-spin" />
+                    aguardando login Microsoft (cookie será capturado automaticamente)
+                  </span>
+                )}
+                {samlConnectStatus === 'captured' && (
+                  <span className="text-[oklch(72%_0.16_160)]">
+                    ✓ cookie capturado — túnel iniciando
+                  </span>
+                )}
+                {samlConnectStatus === 'error' && (
+                  <span className="text-[oklch(70%_0.18_25)]">
+                    ✗ {samlConnectError ?? 'erro desconhecido'} — tente a aba "Colar manualmente"
+                  </span>
+                )}
               </div>
-            )}
-          </div>
+              <div
+                className="overflow-hidden rounded-md border border-border bg-black"
+                style={{ aspectRatio: '16 / 10', minHeight: 460 }}
+              >
+                {samlPortalUrl ? (
+                  <iframe
+                    src={samlPortalUrl}
+                    title="VAGG SAML Portal"
+                    className="h-full w-full"
+                    style={{ border: 'none' }}
+                    allow="clipboard-read; clipboard-write"
+                  />
+                ) : (
+                  <div className="flex h-full w-full items-center justify-center text-sm text-muted-foreground">
+                    {samlConnectStatus === 'starting' ? 'preparando portal…' : '—'}
+                  </div>
+                )}
+              </div>
+              <p className="text-[10px] text-muted-foreground">
+                Dica: o browser remoto roda no servidor VAGG. Se o gateway recusar
+                MITM ou usar cert pinning, use a aba "Colar manualmente".
+              </p>
+            </>
+          )}
 
-          <p className="text-[10px] text-muted-foreground">
-            Dica: este browser roda no servidor VAGG (não no seu PC). Por isso o
-            cookie capturado aqui é válido pra subir o túnel — o gateway VPN
-            associa a sessão ao IP do servidor, não ao seu.
-          </p>
+          {samlTab === 'manual' && (
+            <div className="space-y-3">
+              <ol className="space-y-2 rounded-md border border-border bg-popover px-4 py-3 text-[12px]">
+                <li>
+                  <strong>1.</strong> No seu browser, navegue até a URL SAML do
+                  gateway{' '}
+                  {samlConnectFor?.vpn_type === 'openfortivpn' ? (
+                    <code className="rounded bg-muted px-1.5 py-0.5 text-[11px]">
+                      https://&lt;gateway&gt;:&lt;port&gt;/remote/saml/start
+                    </code>
+                  ) : (
+                    <code className="rounded bg-muted px-1.5 py-0.5 text-[11px]">
+                      https://&lt;gateway&gt;/global-protect/
+                    </code>
+                  )}{' '}
+                  e complete o login Microsoft (email + senha + MFA).
+                </li>
+                <li>
+                  <strong>2.</strong> Após o login (mesmo se aparecer "página não
+                  encontrada"), abra DevTools (<kbd>F12</kbd>) → aba <strong>Application</strong> (Chrome/Edge)
+                  ou <strong>Storage</strong> (Firefox) → <strong>Cookies</strong> →
+                  domínio do gateway.
+                </li>
+                <li>
+                  <strong>3.</strong> Localize o cookie de sessão{' '}
+                  {samlConnectFor?.vpn_type === 'openfortivpn' ? (
+                    <code className="rounded bg-muted px-1.5 py-0.5 text-[11px]">SVPNCOOKIE</code>
+                  ) : samlConnectFor?.vpn_type === 'globalprotect' ? (
+                    <>
+                      <code className="rounded bg-muted px-1.5 py-0.5 text-[11px]">portal-userauthcookie</code>{' '}
+                      ou <code className="rounded bg-muted px-1.5 py-0.5 text-[11px]">prelogin-cookie</code>
+                    </>
+                  ) : (
+                    <em>(o nome varia por gateway — veja "cookies vistos" abaixo)</em>
+                  )}
+                  , copie o valor (ou clique-direito → "Edit cookie" → copie a célula inteira).
+                </li>
+                <li>
+                  <strong>4.</strong> Cole no campo abaixo. O backend aceita raw value,
+                  <code className="mx-1 rounded bg-muted px-1 py-0.5 text-[11px]">NAME=value</code>,
+                  full Cookie header ou JSON do DevTools.
+                </li>
+              </ol>
+
+              {samlSeenCookies.length > 0 && (
+                <div className="rounded-md border border-border bg-popover px-3 py-2 text-[11px]">
+                  <p className="mb-1 font-medium text-muted-foreground">
+                    Cookies que o saml-portal viu o gateway setar (último portal aberto):
+                  </p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {samlSeenCookies.map((c) => (
+                      <span
+                        key={c.name}
+                        className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] ${
+                          c.in_watchlist
+                            ? 'border-[oklch(72%_0.16_160)]/40 text-[oklch(72%_0.16_160)]'
+                            : 'border-[oklch(78%_0.14_75)]/40 text-[oklch(78%_0.14_75)]'
+                        }`}
+                      >
+                        {c.name} {c.in_watchlist ? '· auto-OK' : '· paste'}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <textarea
+                value={samlPasteValue}
+                onChange={(e) => setSamlPasteValue(e.target.value)}
+                placeholder='Ex: SVPNCOOKIE=abc123... OU {"name":"SVPNCOOKIE","value":"abc..."}'
+                rows={5}
+                className="w-full rounded-md border border-input bg-popover px-3 py-2 font-mono text-[12px] focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                disabled={samlPasteBusy}
+                autoFocus
+              />
+
+              <div className="flex justify-end">
+                <Button
+                  onClick={applyPastedCookie}
+                  disabled={!samlPasteValue.trim() || samlPasteBusy}
+                >
+                  {samlPasteBusy ? (
+                    <>
+                      <Loader2 size={14} className="mr-1.5 animate-spin" />
+                      Aplicando…
+                    </>
+                  ) : (
+                    'Aplicar cookie e conectar'
+                  )}
+                </Button>
+              </div>
+            </div>
+          )}
         </div>
       </Modal>
 

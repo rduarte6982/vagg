@@ -72,14 +72,28 @@ JNLP_PRELOGON_INDEX = 2
 # - portalusersso é variante legacy.
 GP_PREFERENCE_ORDER = ("portal-userauthcookie", "prelogin-cookie", "portalusersso")
 
-# Cookies HTTP de outros gateways VPN.
-OTHER_VPN_COOKIE_NAMES = ("webvpn", "SVPNCOOKIE", "VPNSESSION", "MSISAuthenticated")
+# Cookies HTTP de outros gateways VPN — lista expandida pra cobrir variantes
+# raras de FortiGate, Cisco AnyConnect, Pulse, Citrix, etc.
+OTHER_VPN_COOKIE_NAMES = (
+    "webvpn",            # Cisco AnyConnect
+    "webvpnx",           # Cisco AnyConnect (variante TLS 1.3)
+    "webvpn_login",      # Cisco AnyConnect (post-login)
+    "SVPNCOOKIE",        # FortiGate SSL VPN
+    "VPNSESSION",        # Pulse Secure / Ivanti
+    "MSISAuthenticated", # Microsoft IIS (ADFS portal)
+    "FortiAuth",         # FortiGate variantes mais novas
+    "FORTISTATEFUL",     # FortiGate stateful session
+    "SSL_VPN_AUTH",      # genérico SSL VPN
+    "session_cookie",    # alguns Citrix/NetScaler
+    "authcookie",        # cookie name referenciado por openconnect --cookie
+    "NSC_AAAC",          # Citrix Gateway
+)
 
 # FortiGate (openfortivpn): SVPNCOOKIE é o cookie de sessão setado pelo
 # gateway depois do SAML callback bem-sucedido. Diferente do GP, NÃO há
 # prelogin-cookie — o gateway retorna direto SVPNCOOKIE no Set-Cookie do
 # response final do /remote/saml/login ou /remote/login.
-FORTI_COOKIE_NAMES = ("SVPNCOOKIE",)
+FORTI_COOKIE_NAMES = ("SVPNCOOKIE", "FortiAuth", "FORTISTATEFUL")
 
 # Sufixos no path da request que indicam que estamos voltando do SAML
 # (gateway processou a SAMLResponse e seta o cookie de sessão).
@@ -466,6 +480,44 @@ def _trigger_login_exchange(gateway_host: str, prelogin_cookie: str, user_hint: 
 _followup_done = True
 
 
+def _log_all_set_cookies(flow_host: str, path: str, set_cookie_headers: list[str]) -> None:
+    """Log diagnóstico: TODOS os nomes de cookie vistos no caminho, mesmo
+    os que não vão pra captura. Permite identificar nomes de cookie de
+    gateways exóticos pra adicionar à watchlist depois.
+
+    Salva em /share/cookies-seen.log (JSONL) que sobrevive ao container.
+    """
+    if not set_cookie_headers:
+        return
+    cookie_summary: list[dict[str, object]] = []
+    for sc in set_cookie_headers:
+        m = re.match(r"\s*([^=;\s]+)\s*=\s*([^;\s]*)", sc)
+        if m:
+            name = m.group(1)
+            value = m.group(2)
+            cookie_summary.append({
+                "name": name,
+                "value_len": len(value),
+                "value_prefix": value[:8] if value else "",
+                "in_watchlist": name in (
+                    GP_PREFERENCE_ORDER + OTHER_VPN_COOKIE_NAMES + FORTI_COOKIE_NAMES
+                ),
+            })
+    if not cookie_summary:
+        return
+    log_line = {
+        "ts": datetime.now(UTC).isoformat(),
+        "host": flow_host,
+        "path": path[:200],
+        "cookies": cookie_summary,
+    }
+    try:
+        with open("/share/cookies-seen.log", "a", encoding="utf-8") as f:
+            f.write(json.dumps(log_line) + "\n")
+    except OSError:
+        pass  # log é diagnóstico — falha não é fatal
+
+
 def response(flow: http.HTTPFlow) -> None:
     global _followup_done
     target_host = (ctx.options.vagg_gateway_host or "").lower()
@@ -478,6 +530,10 @@ def response(flow: http.HTTPFlow) -> None:
     set_cookie_headers = flow.response.headers.get_all("Set-Cookie")
     body = flow.response.get_text(strict=False) or ""
     path = flow.request.path or ""
+
+    # Diagnóstico: log TODOS os Set-Cookie vistos no gateway (mesmo
+    # os que não estão na watchlist). Útil pra identificar nome novo.
+    _log_all_set_cookies(flow_host, path, set_cookie_headers)
 
     # Acumula TODOS os cookies vistos no caminho. Quando portal-userauthcookie
     # finalmente aparecer (após Firefox seguir o flow completo), upgradamos.
