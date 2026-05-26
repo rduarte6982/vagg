@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <title>VAGG SAML Relay · Opções</title>
+    <link rel="stylesheet" href="popup.html#options" />
+    <style>
+      body {
+        font-family: system-ui, -apple-system, Segoe UI, sans-serif;
+        max-width: 480px;
+        margin: 24px auto;
+        padding: 24px;
+        background: #0a1530;
+        color: #e8eaf6;
+        border-radius: 8px;
+      }
+      h1 { color: #d4af37; margin-top: 0; }
+      label { display: block; margin: 14px 0 6px; }
+      input {
+        width: 100%; box-sizing: border-box;
+        background: #0f1d3a; border: 1px solid #2a3a5c;
+        border-radius: 4px; padding: 8px; color: #e8eaf6;
+      }
+      button {
+        margin-top: 14px; background: #d4af37; color: #0a1530;
+        border: none; padding: 10px 16px; border-radius: 4px;
+        font-weight: 600; cursor: pointer;
+      }
+      .hint { color: #99a3ba; font-size: 13px; margin: 4px 0 0; }
+    </style>
+  </head>
+  <body>
+    <h1>VAGG SAML Relay — Configuração</h1>
+    <p>Configure a URL do VAGG core. A extensão usa essas credenciais pra fazer o relay SAML quando o gateway VPN redirecionar pra 127.0.0.1:8020 após o login Microsoft.</p>
+
+    <label for="vaggBaseUrl">URL do VAGG</label>
+    <input id="vaggBaseUrl" type="text" placeholder="http://192.168.68.102" />
+    <p class="hint">Ex: <code>http://192.168.68.102</code> ou <code>https://vagg.minhaempresa.com</code></p>
+
+    <label for="accessToken">Access token (admin)</label>
+    <input id="accessToken" type="password" placeholder="eyJhbGciOi..." />
+    <p class="hint">Token JWT do admin. Pegue após login no painel via DevTools: localStorage.getItem('vagg.access_token').</p>
+
+    <button id="save">Salvar</button>
+    <p id="status" class="hint"></p>
+
+    <script src="popup.js"></script>
+  </body>
+</html>

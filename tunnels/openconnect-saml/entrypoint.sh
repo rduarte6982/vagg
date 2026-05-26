@@ -64,15 +64,39 @@ fi
 
 # URL com sufixo :prelogin-cookie ou :portal-userauthcookie diz ao
 # openconnect qual form field receberá o cookie.
+#
+# Interface (portal vs gateway/ssl-vpn) determina QUAL endpoint posta:
+#   /global-protect → POST getconfig.esp (config COMPLETO: ACLs+rotas+gw list)
+#   /ssl-vpn        → POST login.esp     (só autenticação, rotas mínimas)
+#
+# Pra paridade com GP nativo (que sempre passa pelo portal pra puxar config),
+# default é /global-protect quando o cookie veio do flow SAML do portal.
+# Override explícito via TUNNEL_GP_INTERFACE=ssl-vpn (legacy) ou
+# TUNNEL_GP_INTERFACE=global-protect.
 case "$SERVER" in
     */ssl-vpn|*/global-protect) SERVER_BASE="$SERVER" ;;
-    *)                          SERVER_BASE="$SERVER/ssl-vpn" ;;
+    *)
+        # Default ssl-vpn (gateway flow — funciona com cookie do SAML gateway).
+        # Portal flow (TUNNEL_GP_INTERFACE=global-protect) só funciona depois
+        # do patch condicional no openconnect (TODO).
+        case "${TUNNEL_GP_INTERFACE:-ssl-vpn}" in
+            global-protect) SERVER_BASE="$SERVER/global-protect" ;;
+            *)              SERVER_BASE="$SERVER/ssl-vpn" ;;
+        esac
+        ;;
 esac
 SERVER_URL="$SERVER_BASE:$USERGROUP"
 
 GP_UA="PAN GlobalProtect/6.0.1-19 (Windows 10)"
 
-log "openconnect (SAML — server=$SERVER_URL usergroup=$USERGROUP cookie_len=${#COOKIE_VAL})"
+# Portal flow lista 1+ gateways e pede seleção interativa via stdin.
+# Como rodamos --background sem TTY, openconnect trava no fgets.
+# --authgroup pré-seleciona. Default: hostname do portal (geralmente
+# o gateway primário com mesmo nome). Override via TUNNEL_GP_GATEWAY.
+GATEWAY_NAME="${TUNNEL_GP_GATEWAY:-${SERVER%%:*}}"
+GATEWAY_NAME="${GATEWAY_NAME%%/*}"  # tira sufixo /ssl-vpn ou /global-protect se tiver
+
+log "openconnect (SAML — server=$SERVER_URL usergroup=$USERGROUP cookie_len=${#COOKIE_VAL} gateway=$GATEWAY_NAME)"
 
 # VAGG_GP_COOKIE acionado pelo patch local em auth-globalprotect.c:
 # - opt2 da prelogin form é renomeado pra vagg_unused (sem conflito)
@@ -84,6 +108,7 @@ openconnect \
     --protocol=gp \
     --useragent="$GP_UA" \
     --user "${TUNNEL_USERNAME:-vagg-saml}" \
+    --authgroup="$GATEWAY_NAME" \
     --os=win \
     --pid-file "$TUNNEL_PID_FILE" \
     --background \

@@ -61,8 +61,14 @@ RUN cd openconnect && \
 
 # Patch 2b: injeta cookie direto no request body como prelogin-cookie ou
 # portal-userauthcookie (controlado por VAGG_GP_COOKIE_NAME).
+# CRÍTICO: só injeta na PRIMEIRA request (portal getconfig.esp OU gateway
+# login.esp dependendo do flow). Após primeira, gateway emite cookie próprio
+# na resposta e openconnect deve usar ESSE pra requests subsequentes. Se
+# reinjetássemos nosso cookie original em /ssl-vpn/login.esp após /global-protect/
+# getconfig.esp já ter rolado, gateway rejeita com HTTP 512 (portal cookie
+# não é gateway cookie). Gate via static int _vagg_cookie_used.
 RUN cd openconnect && \
-    sed -i 's|append_opt(request_body, "host-id", "7B5A0E9F-4C2D-4A8E-9B1F-6D3C8E5A2F71");|& { const char *_vc = getenv("VAGG_GP_COOKIE"); const char *_vu = getenv("VAGG_GP_COOKIE_NAME"); if (_vc \&\& *_vc) { append_opt(request_body, _vu \&\& *_vu ? _vu : "prelogin-cookie", _vc); vpn_progress(vpninfo, PRG_INFO, "VAGG: appended %s=*** (\%zu chars)\\n", _vu \&\& *_vu ? _vu : "prelogin-cookie", strlen(_vc)); } }|' \
+    sed -i 's|append_opt(request_body, "host-id", "7B5A0E9F-4C2D-4A8E-9B1F-6D3C8E5A2F71");|& { static int _vagg_cookie_used = 0; const char *_vc = getenv("VAGG_GP_COOKIE"); const char *_vu = getenv("VAGG_GP_COOKIE_NAME"); if (_vc \&\& *_vc \&\& !_vagg_cookie_used) { append_opt(request_body, _vu \&\& *_vu ? _vu : "prelogin-cookie", _vc); vpn_progress(vpninfo, PRG_INFO, "VAGG: appended %s=*** (\%zu chars) [first request only]\\n", _vu \&\& *_vu ? _vu : "prelogin-cookie", strlen(_vc)); _vagg_cookie_used = 1; } else if (_vagg_cookie_used) { vpn_progress(vpninfo, PRG_INFO, "VAGG: skipping cookie injection on subsequent request (openconnect uses gateway-issued cookie)\\n"); } }|' \
         auth-globalprotect.c
 
 RUN cd openconnect && \

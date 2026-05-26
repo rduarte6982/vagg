@@ -1,0 +1,42 @@
+{
+  "manifest_version": 3,
+  "name": "VAGG SAML Relay",
+  "version": "1.0.0",
+  "description": "Captura o callback SAML do gateway VPN (FortiGate) e relaya pro VAGG core. Necessário pro admin conectar VPNs com SAML SSO sem copy/paste manual.",
+  "permissions": [
+    "webNavigation",
+    "webRequest",
+    "tabs",
+    "storage",
+    "notifications",
+    "cookies",
+    "declarativeNetRequest",
+    "declarativeNetRequestWithHostAccess"
+  ],
+  "host_permissions": [
+    "http://127.0.0.1/*",
+    "http://*/*",
+    "https://*/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["http://*/*", "https://*/*"],
+      "js": ["content.js"],
+      "run_at": "document_start",
+      "all_frames": false
+    }
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "VAGG SAML Relay"
+  },
+  "options_page": "options.html",
+  "icons": {
+    "16": "icons/icon-16.png",
+    "48": "icons/icon-48.png",
+    "128": "icons/icon-128.png"
+  }
+}

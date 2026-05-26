@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <title>VAGG SAML Relay</title>
+    <style>
+      :root {
+        --bg: #0a1530;
+        --panel: #0f1d3a;
+        --border: #2a3a5c;
+        --text: #e8eaf6;
+        --muted: #99a3ba;
+        --gold: #d4af37;
+        --green: #4ade80;
+      }
+      body {
+        font-family: system-ui, -apple-system, Segoe UI, sans-serif;
+        background: var(--bg);
+        color: var(--text);
+        width: 340px;
+        padding: 16px;
+        margin: 0;
+      }
+      h1 {
+        margin: 0 0 6px;
+        font-size: 14px;
+        color: var(--gold);
+      }
+      p { margin: 4px 0; font-size: 12px; color: var(--muted); }
+      .status-card {
+        margin: 12px 0;
+        padding: 10px;
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        font-size: 12px;
+      }
+      .ok { color: var(--green); font-weight: 600; }
+      .warn { color: var(--gold); font-weight: 600; }
+      .label { color: var(--muted); font-size: 11px; }
+      .val {
+        color: var(--text);
+        font-family: JetBrains Mono, ui-monospace, monospace;
+        font-size: 11px;
+        word-break: break-all;
+      }
+      details { margin-top: 12px; }
+      summary {
+        cursor: pointer;
+        font-size: 11px;
+        color: var(--muted);
+        user-select: none;
+      }
+      label { display: block; font-size: 11px; margin: 8px 0 4px; color: var(--muted); }
+      input {
+        width: 100%;
+        box-sizing: border-box;
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 4px;
+        padding: 6px 8px;
+        color: var(--text);
+        font-size: 11px;
+        font-family: JetBrains Mono, ui-monospace, monospace;
+      }
+      button {
+        width: 100%;
+        background: var(--gold);
+        color: var(--bg);
+        border: none;
+        padding: 8px;
+        border-radius: 4px;
+        font-weight: 600;
+        cursor: pointer;
+        font-size: 12px;
+        margin-top: 8px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>VAGG SAML Relay</h1>
+    <p>Captura automaticamente o callback SAML do gateway VPN.</p>
+
+    <div class="status-card" id="status-card">
+      <div id="status-line">Carregando…</div>
+      <div class="label" style="margin-top: 6px">URL configurada:</div>
+      <div class="val" id="cfg-url">—</div>
+      <div class="label" style="margin-top: 4px">Token:</div>
+      <div class="val" id="cfg-token">—</div>
+    </div>
+
+    <p style="font-size: 11px; color: var(--muted)">
+      <strong style="color: var(--gold)">Auto-configuração:</strong> abra o
+      painel VAGG e faça login. A extensão captura URL + token automaticamente.
+    </p>
+
+    <details>
+      <summary>Diagnóstico (últimas atividades)</summary>
+      <div id="logs" style="
+        margin-top: 8px;
+        max-height: 180px;
+        overflow-y: auto;
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 4px;
+        padding: 6px;
+        font-family: JetBrains Mono, ui-monospace, monospace;
+        font-size: 10px;
+        color: var(--muted);
+        line-height: 1.4;
+      ">
+        Sem atividade ainda.
+      </div>
+      <button id="clear-logs" style="margin-top: 4px; background: var(--panel); color: var(--muted); border: 1px solid var(--border);">Limpar logs</button>
+    </details>
+
+    <details>
+      <summary>Configuração manual (avançado)</summary>
+      <label>URL do VAGG</label>
+      <input id="vaggBaseUrl" type="text" placeholder="http://192.168.68.102" />
+      <label>Access token</label>
+      <input id="accessToken" type="password" placeholder="eyJhbGciOi..." />
+      <button id="save">Salvar manual</button>
+    </details>
+
+    <script src="popup.js"></script>
+  </body>
+</html>
