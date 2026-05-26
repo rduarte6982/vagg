@@ -125,6 +125,7 @@ openconnect \
     --user "${TUNNEL_USERNAME:-vagg-saml}" \
     --authgroup="$GATEWAY_NAME" \
     --os=win \
+    --csd-wrapper=/usr/local/bin/hip-report.sh \
     --pid-file "$TUNNEL_PID_FILE" \
     --background \
     --syslog \

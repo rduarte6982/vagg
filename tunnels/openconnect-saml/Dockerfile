@@ -110,6 +110,7 @@ RUN mkdir -p /var/run/vagg /run
 
 COPY --chmod=0755 shared/tunnel_controller.py            /usr/local/bin/tunnel-controller
 COPY --chmod=0755 openconnect-saml/entrypoint.sh         /usr/local/bin/entrypoint
+COPY --chmod=0755 openconnect-saml/hip-report.sh         /usr/local/bin/hip-report.sh
 
 ENV TUNNEL_CONFIG_PATH=/config/tunnel.conf \
     TUNNEL_PASSWORD_FILE=/config/password \
