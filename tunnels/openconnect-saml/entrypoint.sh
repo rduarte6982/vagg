@@ -30,16 +30,22 @@ if [ -z "$SERVER" ]; then
     SERVER=$(head -1 "$TUNNEL_CONFIG_PATH" | tr -d '\r\n[:space:]')
 fi
 
-# Detecta tipo de cookie e extrai valor.
+# Detecta tipo de cookie e extrai valor. Formato combinado suporta
+# multi-cookie (portal-userauthcookie + portal-prelogonuserauthcookie):
+#   "portal-userauthcookie=A|portal-prelogonuserauthcookie=B"
+# Necessário pra portal-flow (alguns PA configs exigem ambos pra autorizar
+# /ssl-vpn/login.esp).
 COOKIE_VAL=""
+COOKIE_PRELOGON_VAL=""
 USERGROUP=""
-case "${TUNNEL_SAML_COOKIE:-}" in
+PRIMARY="${TUNNEL_SAML_COOKIE%%|*}"
+case "$PRIMARY" in
     "prelogin-cookie="*)
-        COOKIE_VAL="${TUNNEL_SAML_COOKIE#prelogin-cookie=}"
+        COOKIE_VAL="${PRIMARY#prelogin-cookie=}"
         USERGROUP="prelogin-cookie"
         ;;
     "portal-userauthcookie="*)
-        COOKIE_VAL="${TUNNEL_SAML_COOKIE#portal-userauthcookie=}"
+        COOKIE_VAL="${PRIMARY#portal-userauthcookie=}"
         USERGROUP="portal-userauthcookie"
         ;;
     "")
@@ -47,12 +53,21 @@ case "${TUNNEL_SAML_COOKIE:-}" in
         exit 1
         ;;
     *)
-        COOKIE_VAL="$TUNNEL_SAML_COOKIE"
+        COOKIE_VAL="$PRIMARY"
         USERGROUP="prelogin-cookie"
         ;;
 esac
 COOKIE_VAL="${COOKIE_VAL%\"}"
 COOKIE_VAL="${COOKIE_VAL#\"}"
+# Segundo cookie (prelogon) — opcional
+if [ "$TUNNEL_SAML_COOKIE" != "$PRIMARY" ]; then
+    SECONDARY="${TUNNEL_SAML_COOKIE#*|}"
+    case "$SECONDARY" in
+        "portal-prelogonuserauthcookie="*)
+            COOKIE_PRELOGON_VAL="${SECONDARY#portal-prelogonuserauthcookie=}"
+            ;;
+    esac
+fi
 
 mkdir -p "$(dirname "$TUNNEL_CONTROL_SOCKET")"
 [ -p "$TUNNEL_OTP_PIPE" ] || mkfifo "$TUNNEL_OTP_PIPE"

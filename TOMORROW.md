@@ -1,73 +1,73 @@
-# Estado em 2026-05-26 02:00 — sequência pra você de manhã
+# Estado quando você acordar — 2026-05-26 manhã
 
-## Estado funcional ATUAL (no homelab agora)
-- Backend tunnels.py: rodando com `/ssl-vpn/prelogin.esp` (GATEWAY flow)
-- Entrypoint container: usa `/ssl-vpn:prelogin-cookie` + `--authgroup`
-- Image vagg/tunnel-openconnect-saml: SEM patch condicional (versão antiga)
-- Extension instalada: v7 ou v8 (sem diferença pro gateway flow)
+## TL;DR
+Mudei a abordagem da noite. Em vez de rebuildar a image openconnect-saml (que precisa SSH + ~10min), o **backend agora faz o portal-flow ele mesmo via Python httpx**, extrai `portal-userauthcookie` da XML do `getconfig.esp`, e passa pro openconnect já no formato gateway-válido. Sem rebuild de image.
 
-→ MRV conecta, mas só vê routes que o gateway flow empurra: `10.210.5.0/24`, `10.249.11.0/24`, `192.168.0.0/16`, default. Outros 10.210.x.x NÃO acessíveis.
+**Deploy: 1 arquivo, 30 segundos.**
 
-## O que tem PRONTO no working tree (ainda não deployed)
-1. Dockerfile com **patch condicional** (cookie inject só na 1ª request) — em `tunnels/openconnect-saml/Dockerfile`
-2. Backend tunnels.py — atualmente `/ssl-vpn`, mas COMENTÁRIO TODO marca onde trocar
-3. Entrypoint com flag `TUNNEL_GP_INTERFACE` — default `ssl-vpn`
-4. Extension v8 com diagnostic logging — `clients/chrome-extension/vagg-saml-relay-v8.zip`
+## Causa raiz confirmada (research no openconnect source)
 
-## Sequência manhã (estimativa: 15min)
+`auth-globalprotect.c::parse_portal_xml` extrai `<portal-userauthcookie>` da resposta do `/global-protect/getconfig.esp`. Esse é o cookie que `/ssl-vpn/login.esp` aceita.
 
-### Passo 1 — Rebuild da image openconnect-saml (5-10min)
+O `prelogin-cookie` que minha extensão capturava do `/SAML20/SP/ACS` é portal-only — gateway rejeita com HTTP 512 ("auth-failed-password-empty" no header `X-Private-Pan-Globalprotect-Extension`).
+
+## O que mudou (commit pendente)
+
+[core/src/vagg_core/api/v1/tunnels.py](core/src/vagg_core/api/v1/tunnels.py) — endpoint `relay_saml_cookie`:
+- Se cookie é `prelogin-cookie` E `vpn_type=globalprotect`, faz POST httpx em `/global-protect/getconfig.esp` com `User-Agent: PAN GlobalProtect`
+- Parseia XML, extrai `<portal-userauthcookie>` + `<portal-prelogonuserauthcookie>`
+- Salva no DB como `portal-userauthcookie=VALUE|portal-prelogonuserauthcookie=VALUE2` (formato combinado)
+- Fallback: se getconfig falhar, continua com prelogin-cookie original (gateway flow limitado)
+
+[tunnels/openconnect-saml/entrypoint.sh](tunnels/openconnect-saml/entrypoint.sh):
+- Parse do formato combinado `cookie1=A|cookie2=B`
+- USERGROUP fica como `portal-userauthcookie` quando esse é o tipo
+- Patch openconnect já injeta com VAGG_GP_COOKIE_NAME — agora vai com nome certo
+
+## Deploy (30s)
+
 ```powershell
 cd C:\Users\rodrigoduarte\vagg
-scp -r tunnels rodrigo@192.168.68.102:/tmp/vagg-tunnels-new/
-ssh rodrigo@192.168.68.102 "cd /tmp/vagg-tunnels-new && docker build -f openconnect-saml/Dockerfile -t vagg/tunnel-openconnect-saml:test . && docker images vagg/tunnel-openconnect-saml:test"
-```
-
-### Passo 2 — Trocar backend pra portal flow
-Edite `core/src/vagg_core/api/v1/tunnels.py` linha ~330:
-```python
-prelogin_url = f"{gateway_url}/global-protect/prelogin.esp"
-```
-
-Deploy:
-```powershell
 scp core/src/vagg_core/api/v1/tunnels.py rodrigo@192.168.68.102:/tmp/tunnels.py
-ssh rodrigo@192.168.68.102 "docker cp /tmp/tunnels.py vagg-vagg-core-1:/usr/local/lib/python3.12/site-packages/vagg_core/api/v1/tunnels.py && docker restart vagg-vagg-core-1"
+scp tunnels/openconnect-saml/entrypoint.sh rodrigo@192.168.68.102:/tmp/entrypoint.sh
+ssh rodrigo@192.168.68.102 "docker cp /tmp/tunnels.py vagg-vagg-core-1:/usr/local/lib/python3.12/site-packages/vagg_core/api/v1/tunnels.py && CID=`$(docker create vagg/tunnel-openconnect-saml:test) && docker cp /tmp/entrypoint.sh `$CID:/usr/local/bin/entrypoint && docker commit `$CID vagg/tunnel-openconnect-saml:test && docker rm `$CID && docker restart vagg-vagg-core-1 && docker stop vagg-tunnel-mrv 2>/dev/null ; docker rm vagg-tunnel-mrv 2>/dev/null ; echo 'PRONTO'"
 ```
 
-### Passo 3 — Subir container MRV com portal flow
-No painel: para MRV → aguarda 20s → adiciona env var `TUNNEL_GP_INTERFACE=global-protect` ao client config (ou patch direto no orchestrator passar isso pro container) → Conectar.
+## Teste (sequência)
 
-OU rapido via docker:
+1. Espera ~10s pro vagg-core restart completo
+2. Painel → Conectar MRV → SSO autopilot deve completar em ~2s
+3. Espera 15s pro openconnect estabelecer
+
+## Validação
+
 ```powershell
-ssh rodrigo@192.168.68.102 "docker stop vagg-tunnel-mrv 2>/dev/null ; docker rm vagg-tunnel-mrv 2>/dev/null ; echo 'pronto, agora conectar via UI'"
+ssh rodrigo@192.168.68.102 "docker logs --tail 30 vagg-vagg-core-1 2>&1 | grep gp_portal_resolve && echo '=== TUNNEL ===' && docker logs --tail 30 vagg-tunnel-mrv 2>&1 && echo '=== PING ===' && ping -c 2 -W 2 10.210.2.44"
 ```
 
-### Passo 4 — Validar
-```powershell
-ssh rodrigo@192.168.68.102 "docker logs --tail 30 vagg-tunnel-mrv && echo '---' && ip route | grep ppp0"
+**Espero ver no log do core:**
+```
+tunnel.gp_portal_resolve.ok client_id=mrv has_prelogon=false
 ```
 
-Espera log mostrar:
+**Espero ver no tunnel:**
 ```
-VAGG: appended prelogin-cookie=*** [first request only]
-VAGG: skipping cookie injection on subsequent request
-... eventually: Connected as X.X.X.X
+POST /ssl-vpn/prelogin.esp
+VAGG: appended portal-userauthcookie=*** (XX chars)
+POST /ssl-vpn/login.esp
+... (resposta 200, não 512)
+Connected as 192.168.X.X
 ```
 
-E `ip route | grep ppp0` deve mostrar MUITO mais subnets (não só 10.210.5.0/24).
+**E ping 10.210.2.44 deve responder.**
 
-Aí testa `ping 10.210.2.44` — agora deve responder.
+## Se ainda falhar
 
-## Se passo 1 (build) demorar demais
-Pode rodar em background:
-```powershell
-ssh rodrigo@192.168.68.102 "cd /tmp/vagg-tunnels-new && nohup docker build -f openconnect-saml/Dockerfile -t vagg/tunnel-openconnect-saml:test . > /tmp/build.log 2>&1 &"
-```
-Verifica depois com `tail /tmp/build.log` e `docker images vagg/tunnel-openconnect-saml:test`.
+Caso 1: log mostra `gp_portal_resolve.no_userauthcookie` com `tags_seen=[...]` — significa que MRV retornou XML mas sem `<portal-userauthcookie>`. Cola o `tags_seen` que eu vejo qual tag MRV usa (variantes: `<userauthcookie>`, `<auth-cookie>`, `<jnlpcookie>`).
 
-## Plan B se portal flow falhar de novo
-- Reverte os 2 arquivos (`tunnels.py` e `entrypoint.sh`) — git checkout vai voltar pro gateway-flow funcional
-- Investigar via DevTools no popup: F12 → Network → /SAML20/SP/ACS → Response Headers (manda os headers que aparecem aí)
+Caso 2: log mostra `gp_portal_resolve.exception` — getconfig.esp call falhou (timeout, cert, etc). Cola o `err` que diagnostico.
 
-Memória relevante: `~/.claude/projects/.../memory/reference_paloalto_gp_saml.md`
+Caso 3: openconnect ainda dá 512 em login.esp — MRV exige `portal-prelogonuserauthcookie` também. Precisa rebuild da image pra adicionar segunda injeção. Aí volta a sequência antiga do TOMORROW.md anterior (manter no git history).
+
+## Memória relevante
+[reference_paloalto_gp_saml](.claude/projects/.../memory/reference_paloalto_gp_saml.md) — 5 pegadinhas críticas

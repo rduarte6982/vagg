@@ -453,8 +453,6 @@ async def relay_saml_cookie(
     if not chosen:
         chosen = body.cookies[0]
     cookie_value = f"{chosen.name}={chosen.value}"
-    # Salva no DB pra subsequent reconnects + dispara connect via orchestrator.connect()
-    client.saml_cookie = cookie_value
     # saml_username é o identity assertado pelo IdP. openconnect usa como
     # --user no follow-up /ssl-vpn/login.esp request. Se a extensão não
     # mandou (PaloAlto antigo só retorna cookie), cai no vpn_username
@@ -462,6 +460,111 @@ async def relay_saml_cookie(
     effective_user = (body.saml_username or client.vpn_username or "").strip() or None
     if body.saml_username:
         client.vpn_username = body.saml_username
+
+    # PORTAL-FLOW PRE-RESOLVER (paridade com GP nativo):
+    #   prelogin-cookie do SAML callback é VÁLIDO só pra /global-protect/
+    #   getconfig.esp (portal). Pra /ssl-vpn/login.esp (gateway) precisa do
+    #   portal-userauthcookie que o getconfig.esp devolve na XML response.
+    #   Ref: openconnect auth-globalprotect.c::parse_portal_xml.
+    #   Sem este pre-resolve, gateway rejeita prelogin-cookie com HTTP 512
+    #   e tunnel sobe com routes MÍNIMAS (gateway flow direto).
+    #   Se já temos portal-userauthcookie (alguns PAs devolvem direto), pula.
+    if (
+        client.vpn_type.value == "globalprotect"
+        and chosen.name == "prelogin-cookie"
+    ):
+        try:
+            import httpx
+            from xml.etree import ElementTree as _ET
+            # Extrai host/port do config_text
+            host = port = None
+            for line in (client.config_text or "").splitlines():
+                s = line.strip()
+                if s.startswith("host"):
+                    host = s.split("=", 1)[1].strip().strip('"').strip("'") if "=" in s else None
+                elif s.startswith("port"):
+                    try:
+                        port = int(s.split("=", 1)[1].strip().strip('"').strip("'"))
+                    except (ValueError, IndexError):
+                        pass
+            if host:
+                gw_url = f"https://{host}:{port}" if port else f"https://{host}"
+                getconfig_url = f"{gw_url}/global-protect/getconfig.esp"
+                # PA portal aceita `prelogin-cookie` como passwd OU como
+                # campo nomeado. openconnect SAML branch usa o nome literal.
+                data = {
+                    "user": effective_user or "",
+                    "prelogin-cookie": chosen.value,
+                    "portal": "",  # portal name, usually empty
+                    "authcookie": "",
+                    "domain": "",
+                    "computer": "vagg-client",
+                    "ok": "Login",
+                    "direct": "yes",
+                    "clientVer": "4100",
+                    "os-version": "Microsoft Windows 10 Pro , 64-bit",
+                    "clientos": "Windows",
+                    "jnlpReady": "jnlpReady",
+                    "prot": "https:",
+                    "internal": "no",
+                    "ipv6-support": "yes",
+                }
+                headers = {"User-Agent": "PAN GlobalProtect"}
+                async with httpx.AsyncClient(verify=False, timeout=20.0) as cl:
+                    resp = await cl.post(getconfig_url, data=data, headers=headers)
+                log.info(
+                    "tunnel.gp_portal_resolve.response",
+                    client_id=client_id,
+                    status=resp.status_code,
+                    body_preview=resp.text[:200],
+                )
+                if resp.status_code == 200 and "<" in resp.text:
+                    try:
+                        root = _ET.fromstring(resp.text)
+                        # Procura portal-userauthcookie e portal-prelogonuserauthcookie
+                        # em QUALQUER nível da árvore (PA aninha em <policy>/<gateways>)
+                        pua = ppua = None
+                        for el in root.iter():
+                            if el.tag == "portal-userauthcookie" and el.text and el.text.strip() not in ("", "empty"):
+                                pua = el.text.strip()
+                            elif el.tag == "portal-prelogonuserauthcookie" and el.text and el.text.strip() not in ("", "empty"):
+                                ppua = el.text.strip()
+                        if pua:
+                            log.info(
+                                "tunnel.gp_portal_resolve.ok",
+                                client_id=client_id,
+                                has_prelogon=bool(ppua),
+                            )
+                            # Substitui o cookie_value pelo portal-userauthcookie
+                            # que é o que /ssl-vpn/login.esp aceita.
+                            cookie_value = f"portal-userauthcookie={pua}"
+                            # Salva também o prelogon se existir — entrypoint
+                            # pode injetar ambos via env extra.
+                            if ppua:
+                                cookie_value += f"|portal-prelogonuserauthcookie={ppua}"
+                        else:
+                            log.warning(
+                                "tunnel.gp_portal_resolve.no_userauthcookie",
+                                client_id=client_id,
+                                tags_seen=[el.tag for el in root.iter()][:30],
+                            )
+                    except _ET.ParseError as exc:
+                        log.warning(
+                            "tunnel.gp_portal_resolve.xml_parse_failed",
+                            client_id=client_id,
+                            err=str(exc),
+                        )
+        except Exception as exc:  # noqa: BLE001
+            log.warning(
+                "tunnel.gp_portal_resolve.exception",
+                client_id=client_id,
+                err=str(exc),
+            )
+            # Continua com prelogin-cookie original — gateway flow ainda funciona
+            # (só com routes limitadas).
+
+    # Salva no DB pra subsequent reconnects + dispara connect via orchestrator.connect()
+    client.saml_cookie = cookie_value
     await session.flush()
     container_id = await orchestrator.connect(
         client_id=client_id,
