@@ -18,15 +18,21 @@ log() { echo "{\"ts\":\"$(date -u +%FT%TZ)\",\"src\":\"entrypoint\",\"msg\":\"$*
 [ -e /dev/ppp ]    || { log "FATAL /dev/ppp missing — host needs ppp_generic kernel module"; exit 1; }
 [ -f "$TUNNEL_CONFIG_PATH" ] || { log "FATAL TUNNEL_CONFIG_PATH=$TUNNEL_CONFIG_PATH not found"; exit 1; }
 
-# Self-heal default route do host quando ausente (homelabs onde algum ppp/tun
-# era o default e expirou). Override via env VAGG_HOST_DEFAULT_GW/_DEV.
-if ! ip -o route show default | grep -q .; then
-    VAGG_GW="${VAGG_HOST_DEFAULT_GW:-192.168.68.1}"
-    VAGG_DEV="${VAGG_HOST_DEFAULT_DEV:-ens18}"
-    if ip route add default via "$VAGG_GW" dev "$VAGG_DEV" 2>/dev/null; then
-        log "self-heal: default route restaurada via $VAGG_GW dev $VAGG_DEV"
-    fi
-fi
+# Self-heal CONTÍNUO da default route do host (watchdog). openfortivpn/openconnect
+# hijackam `default dev pppN`/tun quando conectam — ao cair, ppp some e
+# o reconnect falha "Network is unreachable". Watchdog re-injeta default
+# via ens18 com metric alta — kernel prefere ppp (metric 0) quando ativo;
+# usa este fallback quando ppp some.
+VAGG_GW="${VAGG_HOST_DEFAULT_GW:-192.168.68.1}"
+VAGG_DEV="${VAGG_HOST_DEFAULT_DEV:-ens18}"
+(
+    while true; do
+        if ! ip route show default | grep -q "via $VAGG_GW"; then
+            ip route add default via "$VAGG_GW" dev "$VAGG_DEV" metric 1000 2>/dev/null || true
+        fi
+        sleep 5
+    done
+) &
 
 # Snapshot das tunnel ifaces pré-existentes (network_mode=host expõe ifaces
 # de outros tunnels — auto-discovery precisa filtrar).

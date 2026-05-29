@@ -18,20 +18,25 @@ log() { echo "{\"ts\":\"$(date -u +%FT%TZ)\",\"src\":\"entrypoint\",\"msg\":\"$*
 [ -e /dev/net/tun ] || { log "FATAL /dev/net/tun missing"; exit 1; }
 [ -f "$TUNNEL_CONFIG_PATH" ] || { log "FATAL TUNNEL_CONFIG_PATH=$TUNNEL_CONFIG_PATH not found"; exit 1; }
 
-# Self-heal: se host não tem default route, restaura. openfortivpn precisa
-# alcançar o gateway externo (não-LAN) e sem default sai "Network is
-# unreachable" em loop. network_mode=host + NET_ADMIN deste container roda
-# como root → consegue alterar a rota onde vagg-core (user 1000) falha.
-# Override gateway/dev via VAGG_HOST_DEFAULT_GW/VAGG_HOST_DEFAULT_DEV.
-if ! ip -o route show default | grep -q .; then
-    VAGG_GW="${VAGG_HOST_DEFAULT_GW:-192.168.68.1}"
-    VAGG_DEV="${VAGG_HOST_DEFAULT_DEV:-ens18}"
-    if ip route add default via "$VAGG_GW" dev "$VAGG_DEV" 2>/dev/null; then
-        log "self-heal: default route restaurada via $VAGG_GW dev $VAGG_DEV"
-    else
-        log "self-heal: NÃO consegui adicionar default (cap insuficiente?)"
-    fi
-fi
+# Self-heal CONTÍNUO da default route do host. openfortivpn HIJACKA
+# `default dev pppN` quando conecta — quando o tunnel cai, ppp some
+# levando o default e o reconnect loopa em "Network is unreachable".
+# Watchdog em background re-injeta `default dev ens18` se sumir, em
+# prioridade mais baixa que o pppN (metric maior), mas presente como
+# fallback pra openfortivpn alcançar o gateway sempre.
+# Override env: VAGG_HOST_DEFAULT_GW/_DEV.
+VAGG_GW="${VAGG_HOST_DEFAULT_GW:-192.168.68.1}"
+VAGG_DEV="${VAGG_HOST_DEFAULT_DEV:-ens18}"
+(
+    while true; do
+        # metric 1000 = sempre menor prioridade que default do pppN (metric 0)
+        # Quando ppp existe, kernel usa ppp. Quando ppp some, usa este.
+        if ! ip route show default | grep -q "via $VAGG_GW"; then
+            ip route add default via "$VAGG_GW" dev "$VAGG_DEV" metric 1000 2>/dev/null || true
+        fi
+        sleep 5
+    done
+) &
 
 mkdir -p "$(dirname "$TUNNEL_CONTROL_SOCKET")"
 [ -p "$TUNNEL_OTP_PIPE" ] || mkfifo "$TUNNEL_OTP_PIPE"
