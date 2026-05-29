@@ -18,6 +18,16 @@ log() { echo "{\"ts\":\"$(date -u +%FT%TZ)\",\"src\":\"entrypoint\",\"msg\":\"$*
 [ -e /dev/ppp ]    || { log "FATAL /dev/ppp missing — host needs ppp_generic kernel module"; exit 1; }
 [ -f "$TUNNEL_CONFIG_PATH" ] || { log "FATAL TUNNEL_CONFIG_PATH=$TUNNEL_CONFIG_PATH not found"; exit 1; }
 
+# Self-heal default route do host quando ausente (homelabs onde algum ppp/tun
+# era o default e expirou). Override via env VAGG_HOST_DEFAULT_GW/_DEV.
+if ! ip -o route show default | grep -q .; then
+    VAGG_GW="${VAGG_HOST_DEFAULT_GW:-192.168.68.1}"
+    VAGG_DEV="${VAGG_HOST_DEFAULT_DEV:-ens18}"
+    if ip route add default via "$VAGG_GW" dev "$VAGG_DEV" 2>/dev/null; then
+        log "self-heal: default route restaurada via $VAGG_GW dev $VAGG_DEV"
+    fi
+fi
+
 # Snapshot das tunnel ifaces pré-existentes (network_mode=host expõe ifaces
 # de outros tunnels — auto-discovery precisa filtrar).
 ip -j link show 2>/dev/null > /run/tunnel-iface-snapshot.json || echo '[]' > /run/tunnel-iface-snapshot.json
@@ -57,6 +67,45 @@ fi
 # Remove qualquer linha username/password que tenha vindo do config —
 # auth é via SAML cookie, não credenciais.
 sed -i -E '/^[[:space:]]*(username|password)[[:space:]]*=/d' "$config_file"
+
+# ── MODO --saml-login=PORT ──────────────────────────────────────────────
+# Quando TUNNEL_SAML_LOGIN_PORT está setado, openfortivpn opera no modo
+# "live SAML": abre HTTP server local em 127.0.0.1:PORT esperando o id da
+# session SAML, faz exchange interno por SVPNCOOKIE NA MESMA TLS session
+# (sem TLS pinning) e estabelece tunnel. Bypass do hostcheck do FortiGate
+# sem precisar de cookie pré-capturado.
+#
+# **Wrapper de restart**: openfortivpn --saml-login tem timeout interno
+# hardcoded (~60s de "Timeout listening for incoming HTTP connection"),
+# desiste com "Finally failed" se ninguém entregar o id. Quando isso
+# acontece, container continuaria UP (tunnel-controller é PID 1) mas
+# porta 8020 ficaria sem listener — relay subsequente falharia. Por isso
+# rodamos openfortivpn dentro de um while-true: se morrer (por timeout
+# OU por tunnel encerrado), respawna imediatamente. Quando o tunnel
+# estabelece (state UP), o tunnel-controller reporta connected, o ppp
+# aparece, e o openfortivpn vivo mantém o tunnel via --persistent.
+if [ -n "${TUNNEL_SAML_LOGIN_PORT:-}" ]; then
+    log "saml-login mode active — listening for SAML id on 127.0.0.1:${TUNNEL_SAML_LOGIN_PORT}"
+    (
+        while true; do
+            openfortivpn -c "$config_file" \
+                --saml-login="$TUNNEL_SAML_LOGIN_PORT" \
+                --persistent=10 --set-routes=0 --set-dns=0 -v
+            ec=$?
+            echo "{\"ts\":\"$(date -u +%FT%TZ)\",\"src\":\"saml-login-loop\",\"msg\":\"openfortivpn exited rc=$ec, restarting in 2s\"}"
+            sleep 2
+        done
+    ) &
+    ofvpn_pid=$!
+    echo "$ofvpn_pid" > "$TUNNEL_PID_FILE"
+    trap 'kill -TERM "$ofvpn_pid" 2>/dev/null || true; pkill -TERM openfortivpn 2>/dev/null || true; exit 0' TERM INT
+    exec tunnel-controller \
+        --control-socket "$TUNNEL_CONTROL_SOCKET" \
+        --manager        openfortivpn \
+        --pid-file       "$TUNNEL_PID_FILE" \
+        --otp-pipe       "$TUNNEL_OTP_PIPE" \
+        --log-level      "$TUNNEL_LOG_LEVEL"
+fi
 
 # Resolução do SVPNCOOKIE em 3 fontes, em ordem de prioridade:
 #  1. TUNNEL_SAML_COOKIE env — passado pelo orchestrator quando o usuário
@@ -99,7 +148,7 @@ log "starting openfortivpn (SAML cookie injected via stdin)"
 # openfortivpn --cookie-on-stdin recebe o SVPNCOOKIE inteiro (raw value)
 # pelo stdin. Persistente=10 reconecta se cair.
 echo "$COOKIE_VAL" \
-    | openfortivpn -c "$config_file" --cookie-on-stdin --persistent=10 &
+    | openfortivpn -c "$config_file" --cookie-on-stdin --persistent=10 --set-routes=0 --set-dns=0 &
 ofvpn_pid=$!
 
 echo "$ofvpn_pid" > "$TUNNEL_PID_FILE"

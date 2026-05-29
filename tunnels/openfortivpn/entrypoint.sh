@@ -18,6 +18,21 @@ log() { echo "{\"ts\":\"$(date -u +%FT%TZ)\",\"src\":\"entrypoint\",\"msg\":\"$*
 [ -e /dev/net/tun ] || { log "FATAL /dev/net/tun missing"; exit 1; }
 [ -f "$TUNNEL_CONFIG_PATH" ] || { log "FATAL TUNNEL_CONFIG_PATH=$TUNNEL_CONFIG_PATH not found"; exit 1; }
 
+# Self-heal: se host não tem default route, restaura. openfortivpn precisa
+# alcançar o gateway externo (não-LAN) e sem default sai "Network is
+# unreachable" em loop. network_mode=host + NET_ADMIN deste container roda
+# como root → consegue alterar a rota onde vagg-core (user 1000) falha.
+# Override gateway/dev via VAGG_HOST_DEFAULT_GW/VAGG_HOST_DEFAULT_DEV.
+if ! ip -o route show default | grep -q .; then
+    VAGG_GW="${VAGG_HOST_DEFAULT_GW:-192.168.68.1}"
+    VAGG_DEV="${VAGG_HOST_DEFAULT_DEV:-ens18}"
+    if ip route add default via "$VAGG_GW" dev "$VAGG_DEV" 2>/dev/null; then
+        log "self-heal: default route restaurada via $VAGG_GW dev $VAGG_DEV"
+    else
+        log "self-heal: NÃO consegui adicionar default (cap insuficiente?)"
+    fi
+fi
+
 mkdir -p "$(dirname "$TUNNEL_CONTROL_SOCKET")"
 [ -p "$TUNNEL_OTP_PIPE" ] || mkfifo "$TUNNEL_OTP_PIPE"
 
@@ -87,14 +102,14 @@ if [ "${TUNNEL_REQUIRES_OTP:-}" = "true" ]; then
     # mandar o código). O `cat` de FIFO bloqueia abrir até alguém escrever
     # no outro lado, então open(O_RDONLY) só retorna depois do POST /otp.
     ( printf '%s\n' "$PASS_"; cat "$TUNNEL_OTP_PIPE"; ) \
-        | openfortivpn -c "$config_file" --persistent=10 --otp-prompt &
+        | openfortivpn -c "$config_file" --persistent=10 --set-routes=0 --set-dns=0 --otp-prompt &
     ofvpn_pid=$!
 else
     log "starting openfortivpn (sem MFA)"
     if [ -n "$PASS_" ]; then
         echo "password = $PASS_" >> "$config_file"
     fi
-    openfortivpn -c "$config_file" --persistent=10 &
+    openfortivpn -c "$config_file" --persistent=10 --set-routes=0 --set-dns=0 &
     ofvpn_pid=$!
 fi
 

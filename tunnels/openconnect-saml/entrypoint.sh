@@ -17,6 +17,19 @@ log() { echo "{\"ts\":\"$(date -u +%FT%TZ)\",\"src\":\"entrypoint\",\"msg\":\"$*
 [ -e /dev/net/tun ] || { log "FATAL /dev/net/tun missing"; exit 1; }
 [ -f "$TUNNEL_CONFIG_PATH" ] || { log "FATAL TUNNEL_CONFIG_PATH=$TUNNEL_CONFIG_PATH not found"; exit 1; }
 
+# Self-heal: se host não tem default route, restaura. Necessário porque
+# openconnect precisa alcançar o gateway PA — sem default sai "Network is
+# unreachable" em loop. Container roda como root com NET_ADMIN +
+# network_mode=host → consegue alterar a rota onde vagg-core (user 1000)
+# falha. Override via env VAGG_HOST_DEFAULT_GW/VAGG_HOST_DEFAULT_DEV.
+if ! ip -o route show default | grep -q .; then
+    VAGG_GW="${VAGG_HOST_DEFAULT_GW:-192.168.68.1}"
+    VAGG_DEV="${VAGG_HOST_DEFAULT_DEV:-ens18}"
+    if ip route add default via "$VAGG_GW" dev "$VAGG_DEV" 2>/dev/null; then
+        log "self-heal: default route restaurada via $VAGG_GW dev $VAGG_DEV"
+    fi
+fi
+
 # Snapshot das tunnel ifaces pré-existentes (network_mode=host expõe ifaces
 # de outros tunnels — auto-discovery precisa filtrar).
 ip -j link show 2>/dev/null > /run/tunnel-iface-snapshot.json || echo '[]' > /run/tunnel-iface-snapshot.json
