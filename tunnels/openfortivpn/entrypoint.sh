@@ -107,14 +107,14 @@ if [ "${TUNNEL_REQUIRES_OTP:-}" = "true" ]; then
     # mandar o código). O `cat` de FIFO bloqueia abrir até alguém escrever
     # no outro lado, então open(O_RDONLY) só retorna depois do POST /otp.
     ( printf '%s\n' "$PASS_"; cat "$TUNNEL_OTP_PIPE"; ) \
-        | openfortivpn -c "$config_file" --persistent=10 --set-routes=0 --set-dns=0 --otp-prompt &
+        | openfortivpn -c "$config_file" --persistent=10 --set-routes=1 --set-dns=0 --pppd-use-peerdns=0 --otp-prompt &
     ofvpn_pid=$!
 else
     log "starting openfortivpn (sem MFA)"
     if [ -n "$PASS_" ]; then
         echo "password = $PASS_" >> "$config_file"
     fi
-    openfortivpn -c "$config_file" --persistent=10 --set-routes=0 --set-dns=0 &
+    openfortivpn -c "$config_file" --persistent=10 --set-routes=1 --set-dns=0 --pppd-use-peerdns=0 &
     ofvpn_pid=$!
 fi
 
