@@ -80,15 +80,161 @@ class NetworkApplier:
 
     async def apply(self, plan: NetworkPlan) -> None:
         """Apply the plan in the right order. Raises NetworkApplyError on failure."""
+        await self._ensure_host_default_route()
         await self._apply_sysctls(plan)
         self._ensure_rt_tables(plan)
         await self._apply_iptables(plan)
         await self._reconcile_ip_rules(plan)
         await self._reconcile_ip_routes(plan)
+        await self._apply_host_egress_strict()
         log.info(
             "network.apply.ok",
             clients=len(plan.iface_by_client),
             ip_rules=len(plan.ip_rules),
+        )
+
+    # ----- host default route self-heal -----
+
+    # Quando todos os tunnels caem e o `default` do host era proveniente
+    # de algum ppp/tun (raro mas acontece em homelabs onde o gateway natural
+    # é também a internet via VPN), o host fica sem default route → tunnels
+    # novos não conseguem alcançar gateway → falha em loop.
+    # Self-heal: se o env VAGG_HOST_DEFAULT_GW está setado e o host não tem
+    # default route, adiciona via $VAGG_HOST_DEFAULT_GW dev $VAGG_HOST_DEFAULT_DEV.
+    # Idempotente (skip se já tem default). Default fallback: 192.168.68.1/ens18
+    # (homelab Rodrigo). Override via env pra outros deploys.
+
+    async def _ensure_host_default_route(self) -> None:
+        """Se host não tem default route, adiciona via VAGG_HOST_DEFAULT_GW."""
+        import os
+        res = await self._run(["ip", "-o", "route", "show", "default"])
+        if res.returncode == 0 and res.stdout.strip():
+            return  # já tem default
+        gw = os.getenv("VAGG_HOST_DEFAULT_GW", "192.168.68.1")
+        dev = os.getenv("VAGG_HOST_DEFAULT_DEV", "ens18")
+        add = await self._run(["ip", "route", "add", "default", "via", gw, "dev", dev])
+        if add.returncode == 0:
+            log.info("network.host_default_route.restored", gw=gw, dev=dev)
+        else:
+            log.warning(
+                "network.host_default_route.add_failed",
+                gw=gw, dev=dev, stderr=add.stderr.strip(),
+            )
+
+    # ----- host egress strict (anti-default-hijack) -----
+
+    # Tabela de egress do host: pacotes pra IPs públicos (não-RFC1918) saem
+    # SEMPRE via gateway natural ens18/eth0, NUNCA via ppp/tun de cliente.
+    # Resolve o bug onde openfortivpn (ou outro daemon) sequestra o `default`
+    # do host inteiro com `default dev pppN`. Detalhes em
+    # `docs/screenshots/saml-flow/README.md` e memory `reference_vexia_saml`.
+    _HOST_EGRESS_TABLE_ID = "100"
+    _HOST_EGRESS_RULE_PRIO_RFC1918 = "200"
+    _HOST_EGRESS_RULE_PRIO_DEFAULT = "300"
+
+    async def _detect_host_gateway(self) -> tuple[str, str] | None:
+        """Inspeciona o main table pra inferir o gateway natural do host
+        (algo como ``via 192.168.68.1 dev ens18``). Retorna ``(gw_ip, iface)``
+        ou None se não conseguir.
+
+        Estratégia: procura uma rota ``X.X.X.X via Y.Y.Y.Y dev Z`` (que é
+        adicionada pelo dhclient ou rota estática) e usa Y/Z como o gateway
+        natural. Como fallback, procura no /etc/resolv.conf headers ou
+        algum padrão conhecido.
+        """
+        res = await self._run(["ip", "-o", "route", "show", "table", "main"])
+        if res.returncode != 0:
+            return None
+        # Procura primeiro: linha "X via GW dev IFACE" onde X é IP público
+        # (não-RFC1918) — indica o gateway pra internet.
+        import ipaddress
+        for line in res.stdout.splitlines():
+            parts = line.split()
+            if len(parts) < 5:
+                continue
+            try:
+                dst = parts[0]
+                if dst == "default":
+                    continue
+                if "/" in dst:
+                    net = ipaddress.ip_network(dst, strict=False)
+                    if not net.is_global:
+                        continue
+                else:
+                    if not ipaddress.ip_address(dst).is_global:
+                        continue
+            except ValueError:
+                continue
+            if "via" in parts and "dev" in parts:
+                gw = parts[parts.index("via") + 1]
+                iface = parts[parts.index("dev") + 1]
+                return gw, iface
+        return None
+
+    async def _apply_host_egress_strict(self) -> None:
+        """Configura policy routing strict pra que tráfego do host pra IPs
+        públicos saia sempre via gateway natural, mesmo com `default dev pppN`
+        no main table. Idempotente — re-rodar não duplica nada."""
+        gw_info = await self._detect_host_gateway()
+        if gw_info is None:
+            log.debug("network.host_egress.no_gateway_detected — skipping strict policy")
+            return
+        gw, iface = gw_info
+        tbl = self._HOST_EGRESS_TABLE_ID
+
+        # Tabela 100: default via gw natural
+        await self._run(["ip", "route", "flush", "table", tbl])
+        add_route = await self._run(
+            ["ip", "route", "add", "default", "via", gw, "dev", iface, "table", tbl]
+        )
+        if add_route.returncode != 0:
+            log.warning(
+                "network.host_egress.route_add_failed",
+                table=tbl,
+                gw=gw,
+                iface=iface,
+                stderr=add_route.stderr.strip(),
+            )
+            return
+
+        # Limpa rules antigas (prioridades 200/300) — idempotência
+        rules_res = await self._run(["ip", "-o", "rule", "list"])
+        if rules_res.returncode == 0:
+            for line in rules_res.stdout.splitlines():
+                if line.startswith(("200:", "300:")):
+                    prio = line.split(":", 1)[0]
+                    await self._run(["ip", "rule", "del", "priority", prio])
+
+        # RFC1918 → main (preserva acesso aos clientes via ppp/tun)
+        for cidr in ("10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"):
+            res = await self._run([
+                "ip", "rule", "add", "to", cidr, "lookup", "main",
+                "priority", self._HOST_EGRESS_RULE_PRIO_RFC1918,
+            ])
+            if res.returncode != 0 and "exists" not in res.stderr.lower():
+                log.warning(
+                    "network.host_egress.rfc1918_rule_failed",
+                    cidr=cidr,
+                    stderr=res.stderr.strip(),
+                )
+
+        # 0/0 → tabela tbl (público sempre via gateway natural)
+        res = await self._run([
+            "ip", "rule", "add", "to", "0.0.0.0/0", "lookup", tbl,
+            "priority", self._HOST_EGRESS_RULE_PRIO_DEFAULT,
+        ])
+        if res.returncode != 0 and "exists" not in res.stderr.lower():
+            log.warning(
+                "network.host_egress.default_rule_failed",
+                table=tbl,
+                stderr=res.stderr.strip(),
+            )
+
+        log.info(
+            "network.host_egress.applied",
+            table=tbl,
+            gateway=gw,
+            iface=iface,
         )
 
     # ----- sysctls -----
@@ -130,6 +276,12 @@ class NetworkApplier:
         Drops any prior ``<id> vagg-...`` line (handles renames cleanly) and
         re-emits the desired set from ``plan.rt_tables``. Running twice with
         the same plan produces the exact same file content.
+
+        Tolera PermissionError: o rt_tables é apenas pra friendly names das
+        policy tables — ``ip rule add ... lookup 100`` funciona com ID numérico
+        do mesmo jeito. Quando o container não tem perm pra escrever /etc
+        (caso típico read-only fs ou usuário não-root), só logamos warning.
+        Item §11.5 do MANUAL.md.
         """
         if not plan.rt_tables:
             return
@@ -137,11 +289,26 @@ class NetworkApplier:
             existing = self._rt_tables_path.read_text(encoding="utf-8")
         except FileNotFoundError:
             existing = ""
+        except PermissionError:
+            log.warning(
+                "network.rt_tables.read_permission_denied",
+                path=str(self._rt_tables_path),
+                hint="aggregator running with restricted privileges; "
+                "policy routing still works via numeric table IDs",
+            )
+            return
         kept = [line for line in existing.splitlines() if " vagg-" not in line]
         for table_id, name in plan.rt_tables:
             kept.append(f"{table_id} {name}")
-        self._rt_tables_path.parent.mkdir(parents=True, exist_ok=True)
-        self._rt_tables_path.write_text("\n".join(kept) + "\n", encoding="utf-8")
+        try:
+            self._rt_tables_path.parent.mkdir(parents=True, exist_ok=True)
+            self._rt_tables_path.write_text("\n".join(kept) + "\n", encoding="utf-8")
+        except PermissionError:
+            log.warning(
+                "network.rt_tables.write_permission_denied",
+                path=str(self._rt_tables_path),
+                hint="run installer once to chown the file, or accept numeric IDs",
+            )
 
     # ----- iptables-restore (atomic) -----
 
