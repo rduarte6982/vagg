@@ -29,7 +29,11 @@ VAGG_DEV="${VAGG_HOST_DEFAULT_DEV:-ens18}"
         if ! ip route show default | grep -q "via $VAGG_GW"; then
             ip route add default via "$VAGG_GW" dev "$VAGG_DEV" metric 1000 2>/dev/null || true
         fi
-        sleep 5
+        # Remove default dev pppN/tun* — agregador não pode ter tunnel hijackando default
+        ip route show | awk '/^default dev (ppp|tun)/ {print $0}' | while read -r line; do
+            ip route del $line 2>/dev/null || true
+        done
+        sleep 3
     done
 ) &
 

@@ -29,12 +29,19 @@ VAGG_GW="${VAGG_HOST_DEFAULT_GW:-192.168.68.1}"
 VAGG_DEV="${VAGG_HOST_DEFAULT_DEV:-ens18}"
 (
     while true; do
-        # metric 1000 = sempre menor prioridade que default do pppN (metric 0)
-        # Quando ppp existe, kernel usa ppp. Quando ppp some, usa este.
+        # 1. Garante default via ens18 (fallback when no ppp present)
         if ! ip route show default | grep -q "via $VAGG_GW"; then
             ip route add default via "$VAGG_GW" dev "$VAGG_DEV" metric 1000 2>/dev/null || true
         fi
-        sleep 5
+        # 2. REMOVE default dev pppN — openfortivpn com --set-routes=1 pode
+        # adicionar `default dev pppN` (full-tunnel mode) que hijacka TODO
+        # traffic do host, quebrando outros tunnels que tentam alcançar seus
+        # gateways externos. VAGG é AGREGADOR multi-tunnel: cada tunnel só
+        # deve carregar suas subnets específicas, NUNCA o default.
+        ip route show | awk '/^default dev ppp/ {print $0}' | while read -r line; do
+            ip route del $line 2>/dev/null || true
+        done
+        sleep 3
     done
 ) &
 

@@ -27,10 +27,17 @@ VAGG_GW="${VAGG_HOST_DEFAULT_GW:-192.168.68.1}"
 VAGG_DEV="${VAGG_HOST_DEFAULT_DEV:-ens18}"
 (
     while true; do
+        # 1. Garante default fallback via ens18
         if ! ip route show default | grep -q "via $VAGG_GW"; then
             ip route add default via "$VAGG_GW" dev "$VAGG_DEV" metric 1000 2>/dev/null || true
         fi
-        sleep 5
+        # 2. REMOVE default dev pppN/tun* — agregador multi-tunnel NÃO pode
+        # ter um tunnel hijackando o default; quebra outros tunnels que
+        # precisam alcançar seus gateways externos.
+        ip route show | awk '/^default dev (ppp|tun)/ {print $0}' | while read -r line; do
+            ip route del $line 2>/dev/null || true
+        done
+        sleep 3
     done
 ) &
 
