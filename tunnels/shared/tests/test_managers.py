@@ -91,6 +91,7 @@ class TestProcessFifoManagers:
         with pytest.raises(OSError, match="no PID file"):
             await m.signal("SIGTERM")
 
+    @pytest.mark.skipif(not hasattr(os, "mkfifo"), reason="os.mkfifo é POSIX-only")
     async def test_submit_otp_writes_to_fifo(self, tmp_path: Path) -> None:
         pipe_path = tmp_path / "otp.pipe"
         os.mkfifo(pipe_path)  # type: ignore[attr-defined,unused-ignore]
@@ -237,6 +238,7 @@ class TestStrongSwanManager:
         ):
             assert (await m.query_state()) == {"state": "down"}
 
+    @pytest.mark.skipif(not hasattr(os, "mkfifo"), reason="os.mkfifo é POSIX-only")
     async def test_otp_writes_to_fifo(self, tmp_path: Path) -> None:
         pipe_path = tmp_path / "otp.pipe"
         os.mkfifo(pipe_path)  # type: ignore[attr-defined,unused-ignore]
@@ -269,14 +271,18 @@ class TestMakeManager:
     def _ns(self, **overrides: object) -> object:
         from argparse import Namespace
 
-        return Namespace(
-            manager="openvpn",
-            openvpn_mgmt="/tmp/mgmt.sock",
-            pid_file="/run/tunnel.pid",
-            otp_pipe="/run/otp.pipe",
-            wg_iface=None,
-            **overrides,
-        )
+        # Defaults via dict + update pra o override de `manager` (e afins) não
+        # colidir com o kwarg literal (Namespace(manager=..., **{manager:...})
+        # levanta "got multiple values" — bug que quebrava estes testes).
+        fields: dict[str, object] = {
+            "manager": "openvpn",
+            "openvpn_mgmt": "/tmp/mgmt.sock",
+            "pid_file": "/run/tunnel.pid",
+            "otp_pipe": "/run/otp.pipe",
+            "wg_iface": None,
+        }
+        fields.update(overrides)
+        return Namespace(**fields)
 
     def test_dispatch_each_kind(self) -> None:
         for kind in ("openvpn", "openconnect", "openfortivpn", "strongswan"):
