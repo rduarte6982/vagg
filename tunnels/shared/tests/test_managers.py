@@ -174,11 +174,37 @@ class TestWireGuardManager:
         with pytest.raises(OSError, match="not supported"):
             await m.submit_otp("123")
 
-    async def test_signal_sigusr1_is_noop(self) -> None:
+    async def test_signal_sigusr1_restarts_via_wg_quick(self) -> None:
+        # restart real: down + up (não mais no-op). Sem os.kill.
         m = tc.WireGuardManager(iface="wg0")
-        with patch("tunnel_controller.os.kill") as kill_mock:
+        exec_mock = _make_subprocess_mock(0)
+        with (
+            patch("tunnel_controller.asyncio.create_subprocess_exec", exec_mock),
+            patch("tunnel_controller.os.kill") as kill_mock,
+        ):
             await m.signal("SIGUSR1")
         kill_mock.assert_not_called()
+        actions = [c.args for c in exec_mock.call_args_list]
+        assert actions == [("wg-quick", "down", "wg0"), ("wg-quick", "up", "wg0")]
+
+    async def test_signal_sigusr1_raises_when_up_fails(self) -> None:
+        m = tc.WireGuardManager(iface="wg0")
+        proc_down = MagicMock(returncode=0)
+        proc_down.communicate = AsyncMock(return_value=(b"", b""))
+        proc_up = MagicMock(returncode=1)
+        proc_up.communicate = AsyncMock(return_value=(b"", b""))
+        exec_mock = AsyncMock(side_effect=[proc_down, proc_up])
+        with (  # noqa: SIM117
+            patch("tunnel_controller.asyncio.create_subprocess_exec", exec_mock),
+        ):
+            with pytest.raises(OSError, match="wg-quick up"):
+                await m.signal("SIGUSR1")
+
+    async def test_signal_sigterm_still_kills(self) -> None:
+        m = tc.WireGuardManager(iface="wg0")
+        with patch("tunnel_controller.os.kill") as kill_mock:
+            await m.signal("SIGTERM")
+        kill_mock.assert_called_once()
 
 
 # ============================================================

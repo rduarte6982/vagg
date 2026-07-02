@@ -246,12 +246,28 @@ class WireGuardManager:
                 return {"state": "connected"}
         return {"state": "down"}
 
+    async def _wg_quick(self, action: str) -> int:
+        proc = await asyncio.create_subprocess_exec(
+            "wg-quick",
+            action,
+            self._iface,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        await proc.communicate()
+        return proc.returncode if proc.returncode is not None else -1
+
     async def signal(self, sig: str) -> None:
-        # WireGuard restart is "wg-quick down + up", not signal-based.
-        # We model SIGUSR1 (restart) as a no-op success; entrypoint runs wg-quick.
+        # WireGuard não reconecta por sinal — restart real é "wg-quick down + up".
+        # O entrypoint só roda `wg-quick up` uma vez no boot, então o restart TEM
+        # que ser feito aqui (antes era no-op → `restart` retornava ok sem efeito).
         if sig.upper() in {"SIGUSR1", "SIGHUP"}:
+            await self._wg_quick("down")  # tolera falha (iface pode já estar down)
+            rc = await self._wg_quick("up")
+            if rc != 0:
+                raise OSError(f"wg-quick up {self._iface} falhou (rc={rc})")
             return
-        # SIGTERM is honored — kill the entrypoint shell.
+        # SIGTERM é honrado — mata o shell do entrypoint.
         os.kill(1, _signal_to_int(sig))
 
     async def submit_otp(self, code: str) -> None:  # noqa: ARG002
