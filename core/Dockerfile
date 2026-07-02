@@ -40,6 +40,13 @@ RUN groupadd --system --gid 1000 vagg \
 
 WORKDIR /app
 
+# Runtime precisa de iproute2/iptables/procps quando o core roda em container e
+# aplica rotas/NAT (SPEC §3.4). Sem isso as chamadas de rede falham. (Patch §11.5
+# do homelab, reconciliado pro repo em 2026-07-02.)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    iproute2 iptables procps \
+    && rm -rf /var/lib/apt/lists/*
+
 COPY --from=builder /wheels /wheels
 RUN pip install --no-index --find-links=/wheels vagg-core \
     && rm -rf /wheels

@@ -1,0 +1,76 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    color-scheme: dark;
+  }
+  body {
+    font-family: 'Inter', system-ui, sans-serif;
+    font-size: 14px;
+    background: #0b0d10;
+    color: #e8eaed;
+    -webkit-font-smoothing: antialiased;
+  }
+  .display-mono,
+  .vagg-wordmark {
+    font-family: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, Consolas,
+      monospace;
+    font-feature-settings: 'ss01', 'cv11';
+  }
+  .vagg-wordmark {
+    font-weight: 600;
+    letter-spacing: 0.02em;
+  }
+  .vagg-wordmark .dot {
+    color: oklch(78% 0.16 162);
+  }
+  .eyebrow {
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 11px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: #7a808a;
+  }
+}
+
+@layer components {
+  .led {
+    @apply inline-block h-2.5 w-2.5 rounded-full;
+    box-shadow: 0 0 0 2px rgba(11, 13, 16, 0.6);
+  }
+  .led-on {
+    background: oklch(78% 0.16 162);
+    box-shadow:
+      0 0 0 2px rgba(11, 13, 16, 0.6),
+      0 0 10px oklch(78% 0.16 162);
+    animation: pulse 2.4s ease-in-out infinite;
+  }
+  .led-warn {
+    background: oklch(78% 0.14 75);
+  }
+  .led-off {
+    background: #4a505a;
+  }
+  .led-error {
+    background: oklch(70% 0.18 25);
+    box-shadow:
+      0 0 0 2px rgba(11, 13, 16, 0.6),
+      0 0 10px oklch(70% 0.18 25);
+  }
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    box-shadow:
+      0 0 0 2px rgba(11, 13, 16, 0.6),
+      0 0 8px oklch(78% 0.16 162);
+  }
+  50% {
+    box-shadow:
+      0 0 0 2px rgba(11, 13, 16, 0.6),
+      0 0 16px oklch(78% 0.16 162);
+  }
+}

@@ -57,6 +57,11 @@ class Settings(BaseSettings):
     jwt_refresh_ttl_seconds: int = 7 * 24 * 3600
     jwt_issuer: str = "vagg-core"
 
+    # Fernet key (32 bytes urlsafe-base64) pra encryption-at-rest de secrets
+    # sensíveis tipo TOTP seeds. Em prod é obrigatória; em dev/test cai pra
+    # derivação HKDF do jwt_secret (ver core.crypto).
+    crypto_key: SecretStr | None = None
+
     # ----- Domain -----
     # SPEC §4.6: 10.200.0.0/16 reserved for virtual range. Configurable in case of conflict.
     virtual_range: str = "10.200.0.0/16"

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, status
@@ -108,29 +108,43 @@ def _decrypt_totp_seed(client: Client) -> TotpSeedSpec | None:
         return TotpSeedSpec(secret=plaintext)
 
 
-@router.post("/connect", response_model=ConnectAck, status_code=status.HTTP_202_ACCEPTED)
-async def connect_tunnel(
-    client_id: str,
-    _: Annotated[CurrentAdmin, Depends(require_admin)],
-    session: Annotated[AsyncSession, Depends(get_db)],
-    orchestrator: Annotated[TunnelOrchestratorProtocol, Depends(get_tunnel_orchestrator)],
-) -> ConnectAck:
-    client = await _load_client(session, client_id)
+async def perform_connect(
+    session: AsyncSession,
+    orchestrator: TunnelOrchestratorProtocol,
+    client: Client,
+) -> str:
+    """Sobe (ou re-sobe) o túnel de um client e atualiza o status para STARTING.
+
+    Compartilhado entre o connect admin (`/clients/{id}/connect`) e o reconnect
+    self-service do consultor (`/me/clients/{id}/reconnect`). Retorna o container_id.
+    """
     if not client.config_text:
         raise ConflictError(
             "cliente não tem config_text definido — atualize via PATCH antes de conectar",
-            context={"id": client_id},
+            context={"id": client.id},
         )
+    # Pré-check de cookie SAML expirado: sem isto, o cookie vencido é injetado e
+    # o túnel falha auth sem explicação. Só bloqueia quando a expiração é conhecida
+    # E já passou (cookie sem expiry registrado é tratado como válido).
+    if client.saml_cookie and client.saml_cookie_expires_at is not None:
+        expires_at = client.saml_cookie_expires_at
+        if expires_at.tzinfo is None:
+            expires_at = expires_at.replace(tzinfo=UTC)
+        if expires_at <= datetime.now(UTC):
+            raise ConflictError(
+                "cookie SAML expirado — reautentique o cliente antes de conectar",
+                context={"id": client.id, "expired_at": expires_at.isoformat()},
+            )
     totp_seed = _decrypt_totp_seed(client)
     if totp_seed is not None:
         log.info(
             "tunnel.connect.auto_otp_enabled",
-            client_id=client_id,
+            client_id=client.id,
             digits=totp_seed.digits,
             period=totp_seed.period,
         )
     container_id = await orchestrator.connect(
-        client_id=client_id,
+        client_id=client.id,
         protocol=client.vpn_type,
         config_text=client.config_text,
         username=client.vpn_username,
@@ -143,6 +157,18 @@ async def connect_tunnel(
     status_row.state = TunnelState.STARTING
     status_row.container_id = container_id
     status_row.last_error = None
+    return container_id
+
+
+@router.post("/connect", response_model=ConnectAck, status_code=status.HTTP_202_ACCEPTED)
+async def connect_tunnel(
+    client_id: str,
+    _: Annotated[CurrentAdmin, Depends(require_admin)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+    orchestrator: Annotated[TunnelOrchestratorProtocol, Depends(get_tunnel_orchestrator)],
+) -> ConnectAck:
+    client = await _load_client(session, client_id)
+    container_id = await perform_connect(session, orchestrator, client)
     return ConnectAck(client_id=client_id, container_id=container_id)
 
 

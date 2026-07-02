@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import hashlib
 import json
 import os
 from dataclasses import dataclass
@@ -31,6 +32,7 @@ from aiodocker.exceptions import DockerError
 from vagg_core.core.errors import ConflictError, CoreError, NotFoundError
 from vagg_core.core.logging import get_logger
 from vagg_core.db.models import TunnelState, VpnType
+from vagg_core.services import totp as totp_svc
 from vagg_core.services.dns_manager import DnsManagerProtocol
 from vagg_core.services.network_manager import NetworkManagerProtocol
 from vagg_core.services.network_plan import iface_name
@@ -49,6 +51,29 @@ class DockerUnavailableError(CoreError):
 class TunnelOrchestrationError(CoreError):
     code = "TUNNEL_ORCHESTRATION_ERROR"
     default_status = 502
+
+
+@dataclass(frozen=True)
+class TotpSeedSpec:
+    """Seed TOTP decifrado + parâmetros de geração — orchestrator usa pra gerar
+    códigos automáticos a cada connect/reconnect.
+
+    O caller (endpoint /connect) decifra o secret do banco e monta esta struct;
+    o orchestrator nunca toca em Fernet diretamente.
+    """
+
+    secret: str  # base32 normalizado (sem padding)
+    digits: int = 6
+    period: int = 30
+    algorithm: str = "sha1"
+
+    def current_code(self) -> str:
+        return totp_svc.generate(
+            self.secret,
+            digits=self.digits,
+            period=self.period,
+            algorithm=self.algorithm,  # type: ignore[arg-type]
+        )
 
 
 @dataclass(frozen=True)
@@ -126,6 +151,7 @@ class TunnelOrchestratorProtocol(Protocol):
         password: str | None = None,
         requires_otp: bool = False,
         saml_cookie: str | None = None,
+        totp_seed: "TotpSeedSpec | None" = None,
     ) -> str: ...
 
     async def disconnect(self, client_id: str) -> None: ...
@@ -151,6 +177,23 @@ class TunnelOrchestratorProtocol(Protocol):
     async def discover(self, client_id: str) -> "DiscoveryReport": ...
 
     async def saml_seen_cookies(self, client_id: str, *, limit: int = 200) -> list[dict[str, Any]]: ...
+
+    async def start_saml_login(
+        self,
+        *,
+        client_id: str,
+        gateway_url: str,
+        config_text: str,
+        port: int = 8020,
+    ) -> dict[str, Any]: ...
+
+    async def relay_saml_id(
+        self,
+        *,
+        client_id: str,
+        saml_id: str,
+        port: int = 8020,
+    ) -> dict[str, Any]: ...
 
 
 class TunnelOrchestrator:
@@ -181,6 +224,9 @@ class TunnelOrchestrator:
         self._controller_timeout = controller_timeout_s
         self._network_manager = network_manager
         self._dns_manager = dns_manager
+        # client_id → task em background que regera código TOTP e empurra no
+        # FIFO enquanto state != connected. Cancelada por disconnect.
+        self._otp_tasks: dict[str, asyncio.Task[None]] = {}
 
     # ----- Helpers -----
 
@@ -289,6 +335,7 @@ class TunnelOrchestrator:
         password: str | None = None,
         requires_otp: bool = False,
         saml_cookie: str | None = None,
+        totp_seed: TotpSeedSpec | None = None,
     ) -> str:
         image = self._image_by_protocol.get(protocol)
         if image is None:
@@ -359,6 +406,20 @@ class TunnelOrchestrator:
             ) from exc
 
         log.info("tunnel.connect.ok", client_id=client_id, container_id=container.id)
+
+        # Auto-OTP: se o cliente tem TOTP seed cadastrado, lança task que
+        # regenera o código a cada janela e empurra no FIFO até o controller
+        # reportar connected. Sem isso, container fica travado esperando
+        # alguém digitar 6 dígitos na UI — incompatível com modelo "túneis
+        # sempre up". Task cancelada por disconnect ou quando state vira UP.
+        if requires_otp and totp_seed is not None:
+            self._cancel_otp_task(client_id)
+            task = asyncio.create_task(
+                self._auto_otp_push_loop(client_id, totp_seed),
+                name=f"vagg-auto-otp-{client_id}",
+            )
+            self._otp_tasks[client_id] = task
+
         # Rebuild the host's NAT / routing state to include this client (SPEC §4.2).
         # Failure here doesn't roll back the container — the health worker re-tries.
         if self._network_manager is not None:
@@ -382,6 +443,9 @@ class TunnelOrchestrator:
         return str(container.id)
 
     async def disconnect(self, client_id: str) -> None:
+        # Para o auto-OTP push primeiro — não adianta empurrar código pra
+        # container que vai morrer.
+        self._cancel_otp_task(client_id)
         try:
             container = await self._docker.containers.get(self.container_name(client_id))
         except DockerError as exc:
@@ -467,6 +531,112 @@ class TunnelOrchestrator:
                 f"controller recusou OTP: {response.get('error', 'unknown')}",
                 context={"client_id": client_id},
             )
+
+    # ----- Auto-OTP loop (TOTP seed cadastrado) -----
+
+    # Tempo máximo de tentativa de auth bem-sucedida. Depois disso o loop
+    # encerra mesmo sem conectar — auth tá quebrada e ficar empurrando
+    # códigos só polui o log.
+    _AUTO_OTP_MAX_DURATION_S = 180.0
+    # Intervalo entre tentativas — abaixo do period TOTP (30s) pra cobrir o
+    # caso "estamos a 2s do fim da janela e a auth vai cair no segundo seguinte".
+    # Não muito agressivo: send_otp escreve no FIFO bloqueante, queremos
+    # evitar acumular escritas em fila.
+    _AUTO_OTP_INTERVAL_S = 5.0
+    # Espera inicial pra container subir + controller começar a aceitar
+    # comandos. Empiricamente 1.5s cobre o docker create+start+entrypoint
+    # nos protocolos suportados.
+    _AUTO_OTP_INITIAL_DELAY_S = 1.5
+
+    def _cancel_otp_task(self, client_id: str) -> None:
+        task = self._otp_tasks.pop(client_id, None)
+        if task is not None and not task.done():
+            task.cancel()
+
+    async def _auto_otp_push_loop(
+        self, client_id: str, seed: TotpSeedSpec
+    ) -> None:
+        """Bg task: enquanto state != UP, gera código TOTP fresh e empurra
+        via send_otp. Para quando state vira UP ou após _AUTO_OTP_MAX_DURATION_S.
+
+        Idempotente: empurrar o mesmo código duas vezes na mesma janela é
+        seguro — openconnect/openfortivpn consomem o stdin uma vez; escritas
+        extras ficam no pipe pra próximo prompt (que aparece na reconexão
+        --persistent=10 do forti, por exemplo). Em prática isso resolve
+        reconexão automática sem intervenção humana.
+        """
+        loop = asyncio.get_running_loop()
+        deadline = loop.time() + self._AUTO_OTP_MAX_DURATION_S
+        await asyncio.sleep(self._AUTO_OTP_INITIAL_DELAY_S)
+        last_code: str | None = None
+        last_sent_at: float = 0.0
+        while loop.time() < deadline:
+            try:
+                report = await self.status(client_id)
+            except CoreError as exc:
+                log.debug(
+                    "tunnel.auto_otp.status_failed",
+                    client_id=client_id,
+                    error=str(exc.detail),
+                )
+                report = None
+            if report is not None and report.state == TunnelState.UP:
+                log.info("tunnel.auto_otp.connected", client_id=client_id)
+                return
+            if report is not None and report.state in {
+                TunnelState.STOPPED,
+                TunnelState.DOWN,
+                TunnelState.ERRORED,
+            }:
+                # Container morreu ou foi parado — não tem o que empurrar.
+                log.info(
+                    "tunnel.auto_otp.giving_up",
+                    client_id=client_id,
+                    state=report.state.value,
+                )
+                return
+
+            try:
+                code = seed.current_code()
+            except Exception as exc:
+                log.error(
+                    "tunnel.auto_otp.generate_failed",
+                    client_id=client_id,
+                    error=str(exc),
+                )
+                return
+
+            now = loop.time()
+            # Evita repetir o MESMO código no mesmo ciclo (gateway que faz
+            # anti-replay rejeitaria o segundo envio). Mas se o código mudou
+            # OU passou tempo suficiente, manda — cobre reconnect que precisa
+            # de prompt novo.
+            should_send = (
+                code != last_code or (now - last_sent_at) >= seed.period
+            )
+            if should_send:
+                try:
+                    await self.send_otp(client_id, code)
+                    last_code = code
+                    last_sent_at = now
+                    log.info(
+                        "tunnel.auto_otp.pushed",
+                        client_id=client_id,
+                        seconds_remaining=totp_svc.seconds_remaining(seed.period),
+                    )
+                except (NotFoundError, TunnelOrchestrationError) as exc:
+                    # Socket pode não estar pronto ainda; tenta no próximo ciclo.
+                    log.debug(
+                        "tunnel.auto_otp.push_failed",
+                        client_id=client_id,
+                        error=str(exc.detail),
+                    )
+            await asyncio.sleep(self._AUTO_OTP_INTERVAL_S)
+        log.warning(
+            "tunnel.auto_otp.timeout",
+            client_id=client_id,
+            max_duration_s=self._AUTO_OTP_MAX_DURATION_S,
+        )
 
     async def tail_logs(self, client_id: str, *, lines: int = 100) -> list[str]:
         try:
@@ -597,12 +767,13 @@ class TunnelOrchestrator:
         /SAML20/SP/AssertionConsumerService no gateway, onde o mitmproxy
         captura prelogin-cookie/portal-userauthcookie do Set-Cookie.
         """
-        # Mata QUALQUER portal SAML rodando (porta 14500 é fixa — só um pode
-        # estar ativo). Itera pelos containers com label vagg.role=saml-portal
-        # e força remoção.
+        # Mata APENAS o saml-portal anterior DESSE client. Outros clients
+        # podem ter portais paralelos rodando em portas dinâmicas.
         with contextlib.suppress(DockerError):
             existing = await self._docker.containers.list(
-                filters=json.dumps({"label": ["vagg.role=saml-portal"]}),
+                filters=json.dumps({
+                    "label": ["vagg.role=saml-portal", f"vagg.client_id={client_id}"],
+                }),
                 all=True,
             )
             for c in existing:
@@ -616,10 +787,9 @@ class TunnelOrchestrator:
         share_dir = self._client_socket_dir(client_id).parent / f"saml-{client_id}"
         share_dir.mkdir(parents=True, exist_ok=True)
 
-        # Porta fixa 14500 no host. Como só 1 SAML portal pode estar ativo
-        # por vez (start_saml_portal mata o anterior), não precisamos variar
-        # por client. Porta fixa simplifica liberação de firewall.
-        host_port = 14500
+        # Porta dinâmica por client (14500-15000 range). Vexia mantém 14500
+        # backward-compat. Permite N clients SAML simultâneos.
+        host_port = self.saml_portal_port_for(client_id)
 
         # Resolve a URL do IdP via prelogin server-side com UA spoofado. Se
         # falhar (gateway não SAML, network, etc) cai pro fluxo antigo de
@@ -629,17 +799,36 @@ class TunnelOrchestrator:
         # ou /remote/login — o FortiGate redireciona pra Azure AD sozinho.
         if kind == "forti":
             idp_url = None
-            # Para FortiGate, abrir direto a URL de SAML start. Aceita tanto
-            # gateway_url já apontando pro endpoint /remote/saml quanto URL
-            # base — neste último caso anexa /remote/saml/start.
-            if "/remote/" in gateway_url or gateway_url.endswith("/remote/saml"):
-                open_url = gateway_url
+            # Para FortiGate, abrir o endpoint SAML com **?redirect=1**:
+            # esse modo faz o gateway redirecionar pro nosso callback local
+            # (http://127.0.0.1:8020/?id=<id>) APÓS o login Microsoft, em
+            # vez de tentar hostcheck e devolver 403. O saml_callback.py
+            # dentro do container intercepta o redirect, troca o ?id= pelo
+            # SVPNCOOKIE via /remote/saml/auth_id, e grava /share/cookie.
+            # Sem isso, gateways com host-check habilitado (ex: Vexia)
+            # bloqueiam qualquer browser puro com 403 /hostcheck_install.
+            if "/remote/" in gateway_url:
+                # admin já especificou path custom — preserva mas garante
+                # que tem ?redirect=1.
+                sep = "&" if "?" in gateway_url else "?"
+                if "redirect=" not in gateway_url:
+                    open_url = f"{gateway_url}{sep}redirect=1"
+                else:
+                    open_url = gateway_url
             else:
                 base = gateway_url.rstrip("/")
-                open_url = f"{base}/remote/saml/start"
+                open_url = f"{base}/remote/saml/start?redirect=1"
         else:
+            # GlobalProtect: NÃO ir direto pro IdP — gateway precisa iniciar
+            # o flow pra criar session interna. Quando user POSTa SAMLResponse
+            # pro /SAML20/SP/ACS, gateway só seta cookies se foi ele quem
+            # iniciou. Abrir gateway = redirect pro Microsoft = session ok.
+            #
+            # Resolve IdP pra logging/diagnóstico mas usa o gateway URL.
             idp_url = await self._resolve_saml_idp_url(gateway_url)
-            open_url = idp_url or gateway_url
+            base = gateway_url.rstrip("/")
+            # Endpoint que dispara SAML SSO no gateway PA.
+            open_url = f"{base}/global-protect/login.esp"
         log.info(
             "saml.portal.open_url_resolved",
             gateway_url=gateway_url,
@@ -647,12 +836,16 @@ class TunnelOrchestrator:
             kind=kind,
         )
 
-        # User-Agent spoof: GP gateways exigem PAN client UA. FortiGate
-        # aceita qualquer UA "browser-like" — manter Firefox default.
+        # User-Agent spoof: GP gateways exigem PAN client UA. Pra FortiGate
+        # alguns deployments (ex: Vexia 2026-05) exigem UA do FortiClient pra
+        # **pular hostcheck**: sem isso, o POST callback /remote/saml/login
+        # redireciona pro /remote/hostcheck_install e retorna 403. Spoofando
+        # o UA do FortiClient o gateway aceita o cookie SAML como se viesse
+        # do cliente nativo — descoberta no debug do gateway vpnssl.vexia.
         ff_ua_pref = (
             'FF_PREF_general.useragent.override=PAN GlobalProtect/6.0.1-19 (Windows 10)'
             if kind == "gp"
-            else "FF_PREF_dummy=1"
+            else "FF_PREF_general.useragent.override=FortiSSLVPNclient/7.4.0.1310"
         )
 
         config = {
@@ -662,9 +855,14 @@ class TunnelOrchestrator:
                 f"VAGG_SAML_COOKIE_OUT=/share/cookie",
                 f"VAGG_SAML_KIND={kind}",
                 f"VAGG_SAML_PORT={host_port}",
-                # jlesage/firefox usa noVNC + TigerVNC (canvas+websocket).
-                # Funciona em HTTP plano — secure context não é requerido.
-                "WEB_LISTENING_PORT=14500",
+                # jlesage/firefox usa noVNC + TigerVNC. WEB_LISTENING_PORT é a
+                # porta do nginx do container (HTTP+noVNC websockify) — em
+                # network=host expõe direto no host (host_port dinâmico).
+                f"WEB_LISTENING_PORT={host_port}",
+                # VNC_LISTENING_PORT=-1: desabilita TCP rfbport do Xvnc. Sem
+                # isso, MULTIPLOS containers em network=host colidem em :5900.
+                # Nginx interno usa unix socket → noVNC websockify continua OK.
+                "VNC_LISTENING_PORT=-1",
                 "DISPLAY_WIDTH=1280",
                 "DISPLAY_HEIGHT=800",
                 "SECURE_CONNECTION=0",
@@ -675,18 +873,22 @@ class TunnelOrchestrator:
                 # quando o user-agent do Firefox não é reconhecido como
                 # cliente PAN GlobalProtect.
                 f"FF_OPEN_URL={open_url}",
-                # Spoof User-Agent só pra GP — FortiGate aceita Firefox padrão.
+                # Spoof User-Agent — necessário pra GP (PAN client UA) e pra
+                # FortiGate com hostcheck habilitado (FortiSSLVPNclient UA).
                 ff_ua_pref,
             ],
             "HostConfig": {
                 # AutoRemove desabilitado pra preservar logs em caso de erro.
                 # `stop_saml_portal` cuida da cleanup.
                 "AutoRemove": False,
-                "PortBindings": {"14500/tcp": [{"HostPort": str(host_port)}]},
+                # network=host: WEB_LISTENING_PORT dinâmico expõe direto.
+                # Sem PortBindings → sem DNAT (chain DOCKER iptables-nft
+                # incompatibility resolved). Xvnc TCP desabilitado via
+                # VNC_LISTENING_PORT=-1 evita colisão de :5900.
+                "NetworkMode": "host",
                 "Binds": [f"{share_dir}:/share:rw"],
                 "RestartPolicy": {"Name": "no"},
             },
-            "ExposedPorts": {"14500/tcp": {}},
             "Labels": {
                 "vagg.client_id": client_id,
                 "vagg.role": "saml-portal",
@@ -855,6 +1057,489 @@ class TunnelOrchestrator:
                 self._saml_container_name(client_id)
             )
             await container.delete(force=True)
+
+    # ────────────────────────────────────────────────────────────────────
+    # SAML-LOGIN MODE (FortiGate openfortivpn --saml-login=PORT)
+    # ────────────────────────────────────────────────────────────────────
+    #
+    # Caminho NOVO pra FortiGate Vexia (e gateways com host-check ativo).
+    # Não usa Firefox embutido/noVNC — o user loga no browser DELE, e
+    # quando o gateway redireciona pra http://127.0.0.1:PORT/?id=X, o
+    # frontend captura essa URL e chama relay_saml_id. O id é entregue
+    # ao openfortivpn que escuta na MESMA TLS session — sem TLS pinning.
+
+    # Alocadores determinísticos de porta — N clientes SAML simultâneos sem
+    # colisão. Base + hash(client_id) % range. Idempotente: mesmo client
+    # sempre recebe mesma porta. Cliente backward-compat "vexia" mantém 8020.
+    _SAML_LOGIN_PORT_BASE = 8020
+    _SAML_LOGIN_PORT_RANGE = 500
+    _SAML_PORTAL_PORT_BASE = 14500
+    _SAML_PORTAL_PORT_RANGE = 500
+
+    @classmethod
+    def saml_login_port_for(cls, client_id: str) -> int:
+        """Porta loopback do openfortivpn --saml-login pra esse client.
+        Vexia mantém 8020 (legacy); demais espalham em 8021..8520."""
+        if client_id == "vexia":
+            return cls._SAML_LOGIN_PORT_BASE
+        h = int(hashlib.sha256(client_id.encode("utf-8")).hexdigest()[:8], 16)
+        offset = (h % (cls._SAML_LOGIN_PORT_RANGE - 1)) + 1
+        return cls._SAML_LOGIN_PORT_BASE + offset
+
+    @classmethod
+    def saml_portal_port_for(cls, client_id: str) -> int:
+        """Porta host do saml-portal (Firefox+noVNC) pra esse client.
+        Vexia mantém 14500 (legacy); demais espalham em 14501..15000."""
+        if client_id == "vexia":
+            return cls._SAML_PORTAL_PORT_BASE
+        h = int(hashlib.sha256(client_id.encode("utf-8")).hexdigest()[:8], 16)
+        offset = (h % (cls._SAML_PORTAL_PORT_RANGE - 1)) + 1
+        return cls._SAML_PORTAL_PORT_BASE + offset
+
+    async def start_saml_login(
+        self,
+        *,
+        client_id: str,
+        gateway_url: str,
+        config_text: str,
+        port: int | None = None,
+    ) -> dict[str, Any]:
+        """Sobe vagg-tunnel-<client_id> com openfortivpn --saml-login=PORT.
+
+        `port` default é alocado dinamicamente por client_id (vexia=8020 backward-compat).
+        Retorna dict com start_url, port, expected_callback_prefix, container_id, portal_url.
+        """
+        if port is None:
+            port = self.saml_login_port_for(client_id)
+        cfg_dir, env = self._stage_config(
+            client_id,
+            config_text=config_text,
+            username=None,
+            password=None,
+        )
+        env["TUNNEL_SAML_LOGIN_PORT"] = str(port)
+        # Pula auto-OTP — saml-login não precisa de OTP em runtime, o MFA
+        # acontece dentro do flow SAML do Microsoft.
+
+        sock_dir = self._client_socket_dir(client_id)
+        sock_dir.mkdir(parents=True, exist_ok=True)
+
+        # Imagem especializada (mesma usada pelo connect() saml legacy)
+        # tem openfortivpn 1.23.1 que suporta --saml-login.
+        image = self._image_by_protocol.get(VpnType.OPENFORTIVPN, "")
+        tag = image.rsplit(":", 1)[-1] if ":" in image else "test"
+        image = f"vagg/tunnel-openfortivpn-saml:{tag}"
+
+        container_cfg = self._build_container_config(
+            image=image, cfg_dir=cfg_dir, sock_dir=sock_dir, env=env
+        )
+        # Usa o entrypoint da imagem (entrypoint.sh) que detecta o env
+        # TUNNEL_SAML_LOGIN_PORT e roda openfortivpn --saml-login=PORT,
+        # ao mesmo tempo iniciando tunnel-controller pra responder no
+        # control socket (sem isso, /status nunca reporta state=up).
+
+        try:
+            container = await self._docker.containers.create_or_replace(
+                name=self.container_name(client_id),
+                config=container_cfg,
+            )
+            await container.start()
+        except DockerError as exc:
+            log.error(
+                "tunnel.saml_login.start.failed",
+                client_id=client_id,
+                status=exc.status,
+                message=exc.message,
+            )
+            raise TunnelOrchestrationError(
+                f"docker recusou criar/iniciar tunnel SAML-login: {exc.message}",
+                context={"docker_status": exc.status},
+            ) from exc
+
+        log.info(
+            "tunnel.saml_login.start.ok",
+            client_id=client_id,
+            container_id=container.id,
+            port=port,
+        )
+
+        # Dispara task de auto-route em background ASSIM QUE container sobe.
+        # Mesmo que o /saml-login/relay não seja chamado (caso o Firefox
+        # embarcado siga o redirect direto pro openfortivpn em network=host),
+        # essa task vai detectar ppp aparecer e aplicar 172.16/12 + MASQUERADE.
+        asyncio.create_task(self._post_saml_login_route_setup(client_id))
+
+        # gateway_url já vem do client config no formato
+        # https://host:port — só anexa /remote/saml/start?redirect=1.
+        # ?redirect=1 instrui o FortiGate a redirecionar o SAMLResponse
+        # pra 127.0.0.1:PORT em vez de tentar hostcheck via browser.
+        gw = gateway_url.rstrip("/")
+        start_url = f"{gw}/remote/saml/start?redirect=1"
+
+        # Sobe saml-portal embarcado (Firefox + noVNC no servidor) em
+        # network=host, MESMO loopback do tunnel openfortivpn. Quando o
+        # FortiGate redireciona pra http://127.0.0.1:{port}/?id=X, o
+        # Firefox segue o redirect e bate direto no openfortivpn — sem
+        # precisar de copy/paste pelo user nem cert manual no browser DELE.
+        # Saml-portal tem `VAGG_SAML_DISABLE_CALLBACK=1` pra não tentar
+        # ouvir :8020 (que pertence ao openfortivpn).
+        portal_url: str | None = None
+        with contextlib.suppress(Exception):
+            portal_url = await self._start_saml_portal_for_saml_login(
+                client_id=client_id,
+                gateway_url=gateway_url,
+                start_url=start_url,
+            )
+
+        return {
+            "start_url": start_url,
+            "portal_url": portal_url,
+            "port": port,
+            "expected_callback_prefix": f"http://127.0.0.1:{port}/?id=",
+            "container_id": str(container.id),
+        }
+
+    async def _start_saml_portal_for_saml_login(
+        self,
+        *,
+        client_id: str,
+        gateway_url: str,
+        start_url: str,
+    ) -> str:
+        """Sobe Firefox + noVNC remoto em network=host pareado com o tunnel
+        openfortivpn (também network=host). User vê noVNC servido pelo
+        VAGG nginx (sem erro de cert), Firefox interno tem cert store próprio
+        e segue redirect 127.0.0.1:8020 direto pro openfortivpn local."""
+        # Mata qualquer portal anterior
+        # Mata APENAS o saml-portal anterior DESSE client (label vagg.client_id)
+        # — preserva portais de outros clients rodando em paralelo.
+        with contextlib.suppress(DockerError):
+            existing = await self._docker.containers.list(
+                filters=json.dumps({
+                    "label": ["vagg.role=saml-portal", f"vagg.client_id={client_id}"],
+                }),
+                all=True,
+            )
+            for c in existing:
+                with contextlib.suppress(DockerError):
+                    await c.delete(force=True)
+
+        share_dir = self._client_socket_dir(client_id).parent / f"saml-{client_id}"
+        share_dir.mkdir(parents=True, exist_ok=True)
+        host_port = self.saml_portal_port_for(client_id)
+
+        config = {
+            "Image": self._saml_image(),
+            "Env": [
+                f"VAGG_SAML_GATEWAY_URL={gateway_url}",
+                f"VAGG_SAML_COOKIE_OUT=/share/cookie",
+                "VAGG_SAML_KIND=forti",
+                f"VAGG_SAML_PORT={host_port}",
+                # CRÍTICO: desabilita saml_callback embutido. Em network=host
+                # com openfortivpn ao lado, :PORT já é dele.
+                "VAGG_SAML_DISABLE_CALLBACK=1",
+                f"WEB_LISTENING_PORT={host_port}",
+                # VNC_LISTENING_PORT=-1: desabilita TCP rfbport do Xvnc.
+                # Sem isso, multiplos saml-portals em network=host colidem :5900.
+                "VNC_LISTENING_PORT=-1",
+                "DISPLAY_WIDTH=1280",
+                "DISPLAY_HEIGHT=800",
+                "SECURE_CONNECTION=0",
+                "KEEP_APP_RUNNING=1",
+                "DARK_MODE=1",
+                f"FF_OPEN_URL={start_url}",
+                # Anti session-restore: garante que FF_OPEN_URL é honrado
+                # mesmo com profile persistente. Apenas prefs sem chars
+                # especiais (sed-friendly) — homepage URL vai por FF_OPEN_URL.
+                "FF_PREF_browser.sessionstore.resume_from_crash=false",
+                "FF_PREF_browser.sessionstore.max_resumed_crashes=0",
+                "FF_PREF_toolkit.startup.max_resumed_crashes=-1",
+            ],
+            "HostConfig": {
+                "AutoRemove": False,
+                # network=host: compartilha loopback com openfortivpn.
+                # WEB_LISTENING_PORT acima é dinâmico por client → cada saml-portal
+                # ocupa uma porta única no host (14500-15000 range).
+                "NetworkMode": "host",
+                "Binds": [f"{share_dir}:/share:rw"],
+                "RestartPolicy": {"Name": "no"},
+            },
+            "Labels": {
+                "vagg.client_id": client_id,
+                "vagg.role": "saml-portal",
+                "vagg.mode": "saml-login-embedded",
+            },
+        }
+
+        container = await self._docker.containers.create_or_replace(
+            name=self._saml_container_name(client_id),
+            config=config,
+        )
+        await container.start()
+        log.info(
+            "saml.portal.saml_login.started",
+            client_id=client_id,
+            container_id=container.id,
+            host_port=host_port,
+        )
+
+        # Aguarda noVNC pronto (até 45s) — Firefox demora pra subir
+        try:
+            await self._wait_saml_portal_ready(host_port=host_port, timeout_s=45)
+        except Exception:
+            # não-fatal — frontend ainda pode mostrar com retry
+            log.warning("saml.portal.saml_login.not_ready_yet", client_id=client_id)
+
+        portal_host = os.environ.get("VAGG_PUBLIC_HOST", "192.168.68.102")
+        return f"http://{portal_host}:{host_port}/"
+
+    async def relay_saml_id(
+        self,
+        *,
+        client_id: str,
+        saml_id: str,
+        port: int = 8020,
+    ) -> dict[str, Any]:
+        """Encaminha o SAML session id pro openfortivpn local.
+
+        Vagg-core está em network=host, então 127.0.0.1:PORT é o mesmo
+        loopback que openfortivpn (também network=host) está ouvindo.
+        Um simples GET resolve.
+        """
+        # Validate: id deve ser ascii printable, < 200 chars, sem injection.
+        if not saml_id or len(saml_id) > 200:
+            raise ConflictError(
+                "saml_id inválido (vazio ou >200 chars)",
+                context={"client_id": client_id},
+            )
+        if not all(32 < ord(c) < 127 for c in saml_id):
+            raise ConflictError(
+                "saml_id contém caracteres não-imprimíveis",
+                context={"client_id": client_id},
+            )
+
+        url = f"http://127.0.0.1:{port}/?id={saml_id}"
+        try:
+            import httpx
+            async with httpx.AsyncClient(timeout=10.0) as http:
+                resp = await http.get(url)
+        except httpx.HTTPError as exc:
+            raise TunnelOrchestrationError(
+                f"falha ao relayar SAML id pro openfortivpn: {exc}",
+                context={"client_id": client_id, "url": url},
+            ) from exc
+
+        log.info(
+            "tunnel.saml_login.relay.ok",
+            client_id=client_id,
+            saml_id_len=len(saml_id),
+            status=resp.status_code,
+        )
+
+        # Background task: aguarda ppp surgir e aplica rotas/masquerade FortiGate.
+        # openfortivpn rodou com --set-routes=0, então o aggregator precisa
+        # empurrar rotas pros ranges internos do gateway. Default 172.16/12
+        # cobre Vexia (172.19.x) e outras Forti corporativas comuns.
+        asyncio.create_task(self._post_saml_login_route_setup(client_id))
+
+        return {
+            "client_id": client_id,
+            "relayed": True,
+            "status_code": resp.status_code,
+        }
+
+    async def _post_saml_login_route_setup(self, client_id: str) -> None:
+        """Após relay SAML, aguarda nova ppp iface surgir e pusha
+        172.16.0.0/12 + MASQUERADE pra alcançar ranges internos do gateway."""
+        # Snapshot atual de pppN
+        before_res = await self._run_host_cmd(
+            ["ip", "-br", "link", "show"], description="snapshot ppp"
+        )
+        before_ppps = set()
+        if before_res is not None:
+            for line in before_res.splitlines():
+                tok = line.split()[:1]
+                if tok and tok[0].startswith("ppp"):
+                    before_ppps.add(tok[0].split("@", 1)[0])
+
+        # Aguarda até 25s pra ppp novo aparecer
+        new_ppp: str | None = None
+        for _ in range(25):
+            await asyncio.sleep(1)
+            res = await self._run_host_cmd(
+                ["ip", "-br", "link", "show"], description="poll ppp"
+            )
+            if res is None:
+                continue
+            for line in res.splitlines():
+                cols = line.split()
+                if not cols:
+                    continue
+                name = cols[0].split("@", 1)[0]
+                if name.startswith("ppp") and name not in before_ppps and "LOWER_UP" in line:
+                    new_ppp = name
+                    break
+            if new_ppp:
+                break
+
+        if not new_ppp:
+            log.warning(
+                "tunnel.saml_login.route_setup.no_new_ppp",
+                client_id=client_id,
+                before=list(before_ppps),
+            )
+            return
+
+        log.info("tunnel.saml_login.route_setup.found_ppp", client_id=client_id, iface=new_ppp)
+
+        # Aplica rotas + iptables idempotente
+        for cmd, desc in [
+            (
+                ["ip", "route", "replace", "172.16.0.0/12", "dev", new_ppp],
+                "route 172.16/12",
+            ),
+            (
+                ["iptables", "-t", "nat", "-C", "POSTROUTING",
+                 "-d", "172.16.0.0/12", "-o", new_ppp, "-j", "MASQUERADE"],
+                "check masquerade",
+            ),
+        ]:
+            await self._run_host_cmd(cmd, description=desc)
+        # Idempotent ADDs (check antes pra não duplicar)
+        check_fwd = await self._run_host_cmd(
+            ["iptables", "-C", "FORWARD", "-o", new_ppp, "-j", "ACCEPT"],
+            description="check forward out",
+        )
+        if check_fwd is None or "iptables: Bad rule" in (check_fwd or ""):
+            await self._run_host_cmd(
+                ["iptables", "-A", "FORWARD", "-o", new_ppp, "-j", "ACCEPT"],
+                description="forward out",
+            )
+        check_fwd_in = await self._run_host_cmd(
+            ["iptables", "-C", "FORWARD", "-i", new_ppp, "-j", "ACCEPT"],
+            description="check forward in",
+        )
+        if check_fwd_in is None or "iptables: Bad rule" in (check_fwd_in or ""):
+            await self._run_host_cmd(
+                ["iptables", "-A", "FORWARD", "-i", new_ppp, "-j", "ACCEPT"],
+                description="forward in",
+            )
+        check_masq = await self._run_host_cmd(
+            ["iptables", "-t", "nat", "-C", "POSTROUTING",
+             "-d", "172.16.0.0/12", "-o", new_ppp, "-j", "MASQUERADE"],
+            description="check masquerade",
+        )
+        if check_masq is None or "iptables: Bad rule" in (check_masq or ""):
+            await self._run_host_cmd(
+                ["iptables", "-t", "nat", "-A", "POSTROUTING",
+                 "-d", "172.16.0.0/12", "-o", new_ppp, "-j", "MASQUERADE"],
+                description="masquerade 172.16/12",
+            )
+
+        log.info(
+            "tunnel.saml_login.route_setup.ok",
+            client_id=client_id,
+            iface=new_ppp,
+        )
+
+    async def _run_host_cmd(self, argv: list[str], *, description: str) -> str | None:
+        """Executa comando no host namespace (vagg-core em network=host)
+        com privilégios elevados, via `docker exec --user root` no próprio
+        container vagg-core (mesma namespace)."""
+        own_name = await self._get_own_container_name()
+        # Usa Docker client fresh pra não compartilhar conn pool com a
+        # instância principal (que pode estar em meio de outras operações).
+        d = aiodocker.Docker()
+        try:
+            container = await d.containers.get(own_name)
+            execu = await container.exec(
+                cmd=argv,
+                user="root",
+                stdout=True,
+                stderr=True,
+            )
+            stream = execu.start(detach=False)
+            async with stream:
+                output_parts: list[bytes] = []
+                while True:
+                    msg = await stream.read_out()
+                    if msg is None:
+                        break
+                    output_parts.append(msg.data)
+            out = b"".join(output_parts).decode("utf-8", errors="replace")
+            inspect = await execu.inspect()
+            rc = inspect.get("ExitCode") if isinstance(inspect, dict) else None
+            log.info(
+                "tunnel.host_cmd.done",
+                desc=description,
+                argv=argv,
+                rc=rc,
+                out_len=len(out),
+                out_preview=out[:200],
+            )
+            if rc not in (0, None):
+                return None
+            return out
+        except (DockerError, OSError, asyncio.CancelledError) as exc:
+            log.warning("tunnel.host_cmd.failed", desc=description, argv=argv, error=str(exc))
+            return None
+        finally:
+            with contextlib.suppress(Exception):
+                await d.close()
+
+    _own_container_name_cache: str | None = None
+
+    async def _get_own_container_name(self) -> str:
+        """Descobre o nome do container vagg-core dinamicamente. Estratégia:
+        env override > pegar pelo label 'com.docker.compose.service=vagg-core' >
+        /proc/self/cgroup (container ID) > hostname > hardcoded fallback."""
+        if self._own_container_name_cache:
+            return self._own_container_name_cache
+
+        # 1. env override
+        name = os.environ.get("VAGG_CORE_CONTAINER_NAME")
+        if name:
+            self._own_container_name_cache = name
+            return name
+
+        # 2. /proc/self/cgroup contém o container ID
+        try:
+            with open("/proc/self/cgroup", encoding="utf-8") as f:
+                cgroup = f.read()
+            # cgroup v1: "12:cpuset:/docker/<id>"  v2: "0::/docker/<id>"
+            import re as _re
+            m = _re.search(r"/docker[/-]([0-9a-f]{12,64})", cgroup)
+            if m:
+                cid = m.group(1)
+                try:
+                    container = await self._docker.containers.get(cid)
+                    inspect = await container.show()
+                    full_name = inspect.get("Name", "").lstrip("/")
+                    if full_name:
+                        self._own_container_name_cache = full_name
+                        return full_name
+                except DockerError:
+                    pass
+        except OSError:
+            pass
+
+        # 3. busca pelo label compose
+        try:
+            containers = await self._docker.containers.list(
+                filters=json.dumps({"label": ["com.docker.compose.service=vagg-core"]}),
+            )
+            if containers:
+                inspect = await containers[0].show()
+                full_name = inspect.get("Name", "").lstrip("/")
+                if full_name:
+                    self._own_container_name_cache = full_name
+                    return full_name
+        except DockerError:
+            pass
+
+        # 4. fallback hardcoded
+        self._own_container_name_cache = "vagg-vagg-core-1"
+        return self._own_container_name_cache
 
     async def saml_seen_cookies(
         self, client_id: str, *, limit: int = 200

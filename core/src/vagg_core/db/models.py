@@ -104,6 +104,11 @@ class Client(Base):
     saml_cookie_expires_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
+    # Seed TOTP RFC 6238 do user da VPN. Cifrado at-rest com Fernet (ver
+    # core.crypto). Quando setado, orchestrator gera o código de 6 dígitos
+    # automaticamente a cada connect/reconnect — sem secret, o flow OTP cai
+    # pra modo manual (admin digita na UI).
+    totp_secret: Mapped[str | None] = mapped_column(Text, nullable=True)
     # Auto-discovery: na primeira vez que o tunnel transiciona pra UP, o worker
     # roda `ip route` + lê /etc/resolv.conf dentro do container e popula
     # nat_mappings + dns_server. Desliga este flag pra fixar mappings manuais.
@@ -145,7 +150,8 @@ class Client(Base):
 
     __table_args__ = (
         CheckConstraint(
-            "vpn_type IN ('openvpn','openconnect','openfortivpn','wireguard','strongswan')",
+            "vpn_type IN ('openvpn','openconnect','openfortivpn','wireguard',"
+            "'strongswan','globalprotect')",
             name="ck_client_vpn_type",
         ),
     )

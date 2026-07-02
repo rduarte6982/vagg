@@ -15,8 +15,10 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from vagg_core.api.deps import CurrentAdmin, get_db, get_tunnel_orchestrator, require_admin
+from vagg_core.core.crypto import CryptoConfigError, decrypt, encrypt
 from vagg_core.core.errors import ConflictError, NotFoundError
 from vagg_core.db.models import Client, NatMapping, TunnelState, TunnelStatus, VpnType
+from vagg_core.services import totp as totp_svc
 from vagg_core.services.tunnel_orchestrator import TunnelOrchestratorProtocol
 
 router = APIRouter(prefix="/api/v1/clients", tags=["clients"])
@@ -122,6 +124,11 @@ class ClientOut(BaseModel):
     saml_cookie_expires_at: datetime | None = Field(
         default=None, description="Validade do cookie SAML capturado"
     )
+    has_totp_secret: bool = Field(
+        default=False,
+        description="True se há seed TOTP RFC 6238 salvo — VAGG gera o código "
+        "de 6 dígitos automaticamente a cada connect (auto-OTP).",
+    )
     created_at: datetime
     updated_at: datetime
     tunnel_state: TunnelState
@@ -222,6 +229,7 @@ def _to_out(client: Client) -> ClientOut:
         auth_method=client.auth_method or "none",  # type: ignore[arg-type]
         has_saml_cookie=bool(client.saml_cookie),
         saml_cookie_expires_at=client.saml_cookie_expires_at,
+        has_totp_secret=bool(client.totp_secret),
         created_at=client.created_at,
         updated_at=client.updated_at,
         tunnel_state=state,
@@ -407,6 +415,210 @@ async def delete_client(
 ) -> None:
     client = await _load_client(session, client_id)
     await session.delete(client)
+
+
+# ============================================================
+# TOTP / MFA secret (auto-OTP server-side)
+# ============================================================
+
+
+class TotpSetRequest(BaseModel):
+    """Aceita base32 (formato manual setup) ou ``otpauth://`` URI (do QR code)."""
+
+    secret: str = Field(
+        min_length=4,
+        max_length=2048,
+        description=(
+            "Seed TOTP em base32 (ex: 'JBSWY3DPEHPK3PXP') ou URI completa "
+            "do QR (ex: 'otpauth://totp/Issuer:user?secret=...&period=30'). "
+            "Whitespace é ignorado."
+        ),
+    )
+
+
+class TotpInfoOut(BaseModel):
+    has_secret: bool
+    issuer: str | None = None
+    account: str | None = None
+    digits: int = 6
+    period: int = 30
+    algorithm: str = "sha1"
+    seconds_remaining: int | None = Field(
+        default=None,
+        description="Segundos até a próxima janela de 30s (None quando sem secret)",
+    )
+
+
+class TotpPreviewOut(BaseModel):
+    code: str = Field(description="Código TOTP corrente (6-8 dígitos)")
+    seconds_remaining: int
+    period: int
+
+
+def _stored_totp_to_metadata(client: Client) -> totp_svc.TotpMetadata | None:
+    """Decifra o secret armazenado e devolve a TotpMetadata, ou None se não há."""
+    if not client.totp_secret:
+        return None
+    try:
+        plaintext = decrypt(client.totp_secret)
+    except CryptoConfigError as exc:
+        raise ConflictError(
+            f"secret TOTP armazenado não pode ser decifrado: {exc}",
+            context={"client_id": client.id},
+        ) from exc
+    # Formato persistido: JSON com secret + metadata (issuer/account/digits/period/algorithm).
+    try:
+        payload = json.loads(plaintext)
+        return totp_svc.TotpMetadata(
+            secret=payload["secret"],
+            issuer=payload.get("issuer"),
+            account=payload.get("account"),
+            digits=int(payload.get("digits", 6)),
+            period=int(payload.get("period", 30)),
+            algorithm=payload.get("algorithm", "sha1"),
+        )
+    except (json.JSONDecodeError, KeyError, TypeError, ValueError):
+        # Compat: secret legacy armazenado como base32 puro
+        return totp_svc.TotpMetadata(secret=plaintext)
+
+
+@router.put("/{client_id}/totp", response_model=TotpInfoOut)
+async def set_totp_secret(
+    client_id: str,
+    body: TotpSetRequest,
+    _: Annotated[CurrentAdmin, Depends(require_admin)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+) -> TotpInfoOut:
+    """Cadastra o seed TOTP do user da VPN — cifrado at-rest (Fernet).
+
+    Quando setado, o orchestrator gera código fresco a cada connect e empurra
+    no FIFO automaticamente. O admin não precisa mais digitar 6 dígitos.
+
+    Aceita formato base32 puro OU URI ``otpauth://`` (cópia direta do QR).
+    """
+    client = await _load_client(session, client_id)
+    if (client.auth_method or "none") != "otp":
+        raise ConflictError(
+            "TOTP exige auth_method='otp' — defina o método antes de cadastrar o seed",
+            context={"client_id": client_id, "auth_method": client.auth_method},
+        )
+    try:
+        meta = totp_svc.parse_secret(body.secret)
+    except totp_svc.InvalidSecretError as exc:
+        raise ConflictError(
+            f"seed TOTP inválido: {exc}",
+            context={"client_id": client_id},
+        ) from exc
+    # Sanity-check: gera código corrente — falha aqui é bug no parse.
+    try:
+        totp_svc.generate(
+            meta.secret, digits=meta.digits, period=meta.period, algorithm=meta.algorithm
+        )
+    except Exception as exc:
+        raise ConflictError(
+            f"seed TOTP não gera código: {exc}",
+            context={"client_id": client_id},
+        ) from exc
+    payload = json.dumps(
+        {
+            "secret": meta.secret,
+            "issuer": meta.issuer,
+            "account": meta.account,
+            "digits": meta.digits,
+            "period": meta.period,
+            "algorithm": meta.algorithm,
+        }
+    )
+    try:
+        client.totp_secret = encrypt(payload)
+    except CryptoConfigError as exc:
+        raise ConflictError(
+            f"falha ao cifrar seed TOTP: {exc}",
+            context={"client_id": client_id},
+        ) from exc
+    await session.flush()
+    return TotpInfoOut(
+        has_secret=True,
+        issuer=meta.issuer,
+        account=meta.account,
+        digits=meta.digits,
+        period=meta.period,
+        algorithm=meta.algorithm,
+        seconds_remaining=totp_svc.seconds_remaining(meta.period),
+    )
+
+
+@router.delete("/{client_id}/totp", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_totp_secret(
+    client_id: str,
+    _: Annotated[CurrentAdmin, Depends(require_admin)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+) -> None:
+    """Remove o seed TOTP — cliente volta pro fluxo manual (admin digita 6
+    dígitos na UI a cada connect)."""
+    client = await _load_client(session, client_id)
+    client.totp_secret = None
+    await session.flush()
+
+
+@router.get("/{client_id}/totp", response_model=TotpInfoOut)
+async def get_totp_info(
+    client_id: str,
+    _: Annotated[CurrentAdmin, Depends(require_admin)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+) -> TotpInfoOut:
+    """Devolve metadata do TOTP cadastrado (sem expor o seed). Útil pra UI
+    decidir entre "auto-OTP" e "manual"."""
+    client = await _load_client(session, client_id)
+    meta = _stored_totp_to_metadata(client)
+    if meta is None:
+        return TotpInfoOut(has_secret=False)
+    return TotpInfoOut(
+        has_secret=True,
+        issuer=meta.issuer,
+        account=meta.account,
+        digits=meta.digits,
+        period=meta.period,
+        algorithm=meta.algorithm,
+        seconds_remaining=totp_svc.seconds_remaining(meta.period),
+    )
+
+
+@router.post("/{client_id}/totp/preview", response_model=TotpPreviewOut)
+async def preview_totp_code(
+    client_id: str,
+    _: Annotated[CurrentAdmin, Depends(require_admin)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+) -> TotpPreviewOut:
+    """Gera o código TOTP corrente sem consumi-lo — botão "testar" na UI
+    pra admin validar que o seed cadastrado bate com o app autenticador.
+
+    Não persiste nada e não envia ao tunnel. Audit-trail só registra o evento;
+    o código em si NÃO é logado em texto.
+    """
+    client = await _load_client(session, client_id)
+    meta = _stored_totp_to_metadata(client)
+    if meta is None:
+        raise NotFoundError(
+            "nenhum seed TOTP cadastrado",
+            context={"client_id": client_id},
+        )
+    code = totp_svc.generate(
+        meta.secret,
+        digits=meta.digits,
+        period=meta.period,
+        algorithm=meta.algorithm,
+    )
+    return TotpPreviewOut(
+        code=code,
+        seconds_remaining=totp_svc.seconds_remaining(meta.period),
+        period=meta.period,
+    )
+
+
+# ============================================================
+# SAML / SSO endpoints (Azure AD, Okta, etc — fluxo browser remoto)
+# ============================================================
 
 
 def _derive_gateway_url(config_text: str | None) -> str | None:

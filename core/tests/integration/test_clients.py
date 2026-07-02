@@ -64,6 +64,17 @@ class TestClientsCRUD:
         ids = [c["id"] for c in list_resp.json()]
         assert "petroleo" in ids
 
+    async def test_create_globalprotect_vpn_type(self, auth_client: AsyncClient) -> None:
+        # Regressão: o CHECK constraint ck_client_vpn_type do ORM precisa aceitar
+        # 'globalprotect' (a migration 0006 já adicionava, mas o model estava
+        # dessincronizado — create_all criava a constraint sem globalprotect).
+        resp = await auth_client.post(
+            "/api/v1/clients",
+            json=_payload(slug="gp-tenant", vpn_type="globalprotect"),
+        )
+        assert resp.status_code == 201, resp.text
+        assert resp.json()["vpn_type"] == "globalprotect"
+
     async def test_create_without_config_omits_credentials_flags(
         self, auth_client: AsyncClient
     ) -> None:
@@ -207,3 +218,48 @@ class TestTunnelLifecycle:
         assert resp.status_code == 200
         body = resp.json()
         assert body["lines"] == ["line a", "line b"]
+
+    async def test_connect_with_expired_saml_cookie_returns_409(
+        self, auth_client: AsyncClient, session_factory, fake_orchestrator: FakeTunnelOrchestrator
+    ) -> None:
+        from datetime import UTC, datetime, timedelta
+
+        from vagg_core.db.models import Client as ClientModel
+
+        await auth_client.post(
+            "/api/v1/clients", json=_payload(slug="samlexp", vpn_type="globalprotect")
+        )
+        # Injeta um cookie SAML já expirado direto no DB.
+        async with session_factory() as s:
+            c = await s.get(ClientModel, "samlexp")
+            c.saml_cookie = "portal-userauthcookie=abc"
+            c.saml_cookie_expires_at = datetime.now(UTC) - timedelta(hours=1)
+            await s.commit()
+
+        resp = await auth_client.post("/api/v1/clients/samlexp/connect")
+        assert resp.status_code == 409, resp.text
+        assert "SAML" in resp.text
+        # E não deve ter chamado o orchestrator.
+        assert not [call for call in fake_orchestrator.calls if call[0] == "connect"]
+
+    async def test_connect_with_valid_saml_cookie_proceeds(
+        self, auth_client: AsyncClient, session_factory, fake_orchestrator: FakeTunnelOrchestrator
+    ) -> None:
+        from datetime import UTC, datetime, timedelta
+
+        from vagg_core.db.models import Client as ClientModel
+
+        await auth_client.post(
+            "/api/v1/clients", json=_payload(slug="samlok", vpn_type="globalprotect")
+        )
+        async with session_factory() as s:
+            c = await s.get(ClientModel, "samlok")
+            c.saml_cookie = "portal-userauthcookie=abc"
+            c.saml_cookie_expires_at = datetime.now(UTC) + timedelta(hours=6)
+            await s.commit()
+
+        resp = await auth_client.post("/api/v1/clients/samlok/connect")
+        assert resp.status_code == 202, resp.text
+        assert [call[1]["client_id"] for call in fake_orchestrator.calls if call[0] == "connect"] == [
+            "samlok"
+        ]

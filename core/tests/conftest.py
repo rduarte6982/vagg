@@ -85,6 +85,7 @@ class FakeTunnelOrchestrator:
         password: str | None = None,
         requires_otp: bool = False,
         saml_cookie: str | None = None,
+        totp_seed: Any = None,
     ) -> str:
         self._next_container_id += 1
         container_id = f"fake-container-{self._next_container_id}"
@@ -98,6 +99,8 @@ class FakeTunnelOrchestrator:
                     "config_text_len": len(config_text),
                     "username": username,
                     "has_password": password is not None,
+                    "requires_otp": requires_otp,
+                    "has_totp_seed": totp_seed is not None,
                 },
             )
         )

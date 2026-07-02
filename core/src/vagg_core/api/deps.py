@@ -1,4 +1,4 @@
-"""FastAPI dependencies: DB session, JWT-protected admin identity."""
+"""FastAPI dependencies: DB session, JWT-protected admin/user identity."""
 
 from __future__ import annotations
 
@@ -48,19 +48,61 @@ class CurrentAdmin:
     email: str
 
 
+@dataclass(frozen=True)
+class CurrentUser:
+    """Identidade do principal autenticado — admin do .env OU consultor da tabela.
+
+    `consultant_id` é None quando é o admin do .env. `is_admin` é True para o
+    admin do .env e para consultores com role=admin.
+    """
+
+    subject: str
+    role: str
+    consultant_id: int | None
+    name: str | None
+
+    @property
+    def is_admin(self) -> bool:
+        return self.role == "admin"
+
+
 def get_tunnel_orchestrator(request: Request) -> TunnelOrchestratorProtocol:
     orchestrator: TunnelOrchestratorProtocol = request.app.state.tunnel_orchestrator
     return orchestrator
 
 
-async def require_admin(
+async def require_user(
     token: Annotated[str | None, Depends(oauth2_scheme)],
     signer: Annotated[JWTSigner, Depends(get_jwt_signer)],
-) -> CurrentAdmin:
+) -> CurrentUser:
+    """Aceita admin do .env OU consultor — usado pelo VAGG Client."""
     if not token:
         raise AuthRequiredError("token de acesso ausente")
     try:
         claims = signer.decode(token, expected_type=TokenType.ACCESS)
     except pyjwt.PyJWTError as exc:
         raise AuthRequiredError("token inválido ou expirado") from exc
-    return CurrentAdmin(email=str(claims["sub"]))
+
+    subject = str(claims["sub"])
+    role = str(claims.get("role") or "admin")  # tokens antigos não têm role → admin
+    consultant_id_raw = claims.get("consultant_id")
+    consultant_id = int(consultant_id_raw) if consultant_id_raw is not None else None
+    name = claims.get("name")
+    return CurrentUser(
+        subject=subject,
+        role=role,
+        consultant_id=consultant_id,
+        name=str(name) if name else None,
+    )
+
+
+async def require_admin(
+    user: Annotated[CurrentUser, Depends(require_user)],
+) -> CurrentAdmin:
+    """Mantido pra compat: rotas administrativas que recusam consultor não-admin.
+
+    Aceita o admin do .env (sem consultant_id) OU consultor com role=admin.
+    """
+    if not user.is_admin:
+        raise AuthRequiredError("ação requer privilégio de administrador")
+    return CurrentAdmin(email=user.subject)

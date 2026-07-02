@@ -143,3 +143,6 @@ license.jwt
 *.iso
 appliance-build/
 release/
+
+# venv de teste do core
+core/.venv-test/

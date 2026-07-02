@@ -1,0 +1,7 @@
+build/bin/
+build/output/
+frontend/dist/
+frontend/node_modules/
+wailsjs/
+.session
+*.log

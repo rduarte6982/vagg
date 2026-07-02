@@ -1,4 +1,8 @@
-"""CRUD over Consultant (SPEC §5.1, §7)."""
+"""CRUD over Consultant (SPEC §5.1, §7).
+
+Inclui a criação/troca de senha do consultor (usada pelo VAGG Client pra
+fazer login com credenciais próprias, sem precisar do admin).
+"""
 
 from __future__ import annotations
 
@@ -13,6 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from vagg_core.api.deps import CurrentAdmin, get_db, require_admin
 from vagg_core.core.errors import ConflictError, NotFoundError
+from vagg_core.core.security import hash_password
 from vagg_core.db.models import Consultant
 
 router = APIRouter(prefix="/api/v1/consultants", tags=["consultants"])
@@ -23,6 +28,13 @@ ConsultantRole = Literal["viewer", "operator", "admin"]
 class ConsultantCreate(BaseModel):
     email: EmailStr
     name: str = Field(min_length=1, max_length=128)
+    password: str | None = Field(
+        default=None,
+        min_length=4,
+        max_length=128,
+        description="Senha do usuário pra login no VAGG Client. Se ausente, "
+        "o admin precisa setar depois via PUT /consultants/{id}/password.",
+    )
     openvpn_username: str | None = Field(default=None, min_length=1, max_length=128)
     static_pool_ip: str | None = Field(default=None, min_length=4, max_length=45)
     role: ConsultantRole = "viewer"
@@ -38,10 +50,15 @@ class ConsultantUpdate(BaseModel):
     active: bool | None = None
 
 
+class ConsultantSetPassword(BaseModel):
+    password: str = Field(min_length=4, max_length=128)
+
+
 class ConsultantOut(BaseModel):
     id: int
     email: EmailStr
     name: str
+    has_password: bool = Field(description="True se o usuário já tem senha definida")
     openvpn_username: str | None
     static_pool_ip: str | None
     role: ConsultantRole
@@ -55,6 +72,7 @@ def _to_out(c: Consultant) -> ConsultantOut:
         id=c.id,
         email=c.email,
         name=c.name,
+        has_password=bool(c.password_hash),
         openvpn_username=c.openvpn_username,
         static_pool_ip=c.static_pool_ip,
         role=c.role,
@@ -67,7 +85,7 @@ def _to_out(c: Consultant) -> ConsultantOut:
 async def _load(session: AsyncSession, consultant_id: int) -> Consultant:
     obj = await session.get(Consultant, consultant_id)
     if obj is None:
-        raise NotFoundError("consultor não encontrado", context={"id": consultant_id})
+        raise NotFoundError("usuário não encontrado", context={"id": consultant_id})
     return obj
 
 
@@ -95,6 +113,7 @@ async def create_consultant(
     consultant = Consultant(
         email=body.email,
         name=body.name,
+        password_hash=hash_password(body.password) if body.password else None,
         openvpn_username=body.openvpn_username,
         static_pool_ip=body.static_pool_ip,
         role=body.role,
@@ -136,6 +155,21 @@ async def update_consultant(
     except IntegrityError as exc:
         raise ConflictError("violação de restrição na atualização") from exc
     # Refresh so server-side ``updated_at`` is loaded before serializing.
+    await session.refresh(consultant)
+    return _to_out(consultant)
+
+
+@router.put("/{consultant_id}/password", response_model=ConsultantOut)
+async def set_consultant_password(
+    consultant_id: int,
+    body: ConsultantSetPassword,
+    _: Annotated[CurrentAdmin, Depends(require_admin)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+) -> ConsultantOut:
+    """Define ou troca a senha de um consultor — só admin pode."""
+    consultant = await _load(session, consultant_id)
+    consultant.password_hash = hash_password(body.password)
+    await session.flush()
     await session.refresh(consultant)
     return _to_out(consultant)
 
