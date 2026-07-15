@@ -1,12 +1,14 @@
 {
   "app": {
-    "title": "VPN Aggregator",
-    "subtitle": "Admin console"
+    "title": "vagg.",
+    "subtitle": "console",
+    "tagline": "The VPN your consulting practice doesn't need.",
+    "demo_banner": "Demo mode — in-memory data, any login works."
   },
   "nav": {
     "dashboard": "Dashboard",
     "clients": "Clients",
-    "consultants": "Consultants",
+    "consultants": "Users",
     "policies": "Policies",
     "audit": "Audit",
     "system": "System",
@@ -16,11 +18,14 @@
     "theme_light": "Light theme"
   },
   "login": {
-    "email": "Email",
+    "title": "Sign in",
+    "email": "Username",
     "password": "Password",
     "submit": "Sign in",
     "submitting": "Signing in...",
-    "error": "Authentication failed"
+    "error": "Authentication failed",
+    "hint_demo": "In demo mode any username and password will work.",
+    "hint_default": "Default install: admin / admin. Change the password later from the System tab."
   },
   "common": {
     "loading": "Loading...",
@@ -36,17 +41,26 @@
     "search": "Search",
     "export_csv": "Export CSV",
     "export_json": "Export JSON",
-    "refresh": "Refresh"
+    "refresh": "Refresh",
+    "close": "Close",
+    "open_demo": "Open demo mode",
+    "exit_demo": "Exit demo mode"
   },
   "dashboard": {
-    "title": "Dashboard",
+    "title": "Overview",
+    "subtitle": "Aggregator status, connected clients and licensing.",
     "consultants_active": "Active consultants",
     "clients_online": "Clients online",
     "tunnels_total": "Configured tunnels",
-    "license_status": "License status"
+    "license_status": "License status",
+    "internet_status": "Connectivity",
+    "internet_ok": "Aggregator reachable",
+    "topology": "Network map",
+    "recent_audit": "Recent activity"
   },
   "clients": {
     "title": "Clients",
+    "subtitle": "Each client is a remote VPN the aggregator keeps connected for the consultants.",
     "create": "New client",
     "id": "ID",
     "name": "Name",
@@ -61,12 +75,13 @@
     "send_otp": "Send OTP",
     "logs": "Logs",
     "details": "Details",
-    "config_text": "Tunnel configuration",
-    "username": "Username",
-    "password": "Password",
+    "config_text": "Tunnel config (.ovpn / .conf / etc)",
+    "username": "Username (optional)",
+    "password": "Password (optional)",
     "save": "Save client",
     "delete_confirm": "Delete this client?",
-    "no_clients": "No clients yet.",
+    "no_clients": "No clients yet. Click \"New client\" to get started.",
+    "form_intro": "Pick the protocol and network ranges. The virtual CIDR is what consultants see; the real CIDR is what exists on the client side.",
     "states": {
       "stopped": "Stopped",
       "starting": "Starting",
@@ -76,43 +91,69 @@
     }
   },
   "consultants": {
-    "title": "Consultants",
-    "create": "New consultant",
+    "title": "Users",
+    "subtitle": "People authorized to log in via VAGG Client and reach client VPNs.",
+    "create": "New user",
+    "create_subtitle": "The user logs in to VAGG Client (Windows) with the username and password set here.",
+    "edit_subtitle": "Update user data. Fill in Password to change it.",
+    "password_hint_edit": "leave empty to keep current password",
     "email": "Email",
-    "name": "Name",
-    "openvpn_username": "OpenVPN username",
+    "name": "Login",
+    "password": "Password",
+    "password_set": "Set",
+    "password_missing": "Not set",
+    "password_hint": "leave empty to set later",
+    "set_password": "Reset password",
+    "set_password_subtitle": "The next VAGG Client login will use this password.",
+    "new_password": "New password",
+    "openvpn_username": "Login (alternate)",
     "static_pool_ip": "Static pool IP",
     "role": "Role",
     "active": "Active",
-    "delete_confirm": "Delete this consultant?",
-    "no_consultants": "No consultants yet."
+    "delete_confirm": "Delete this user?",
+    "no_consultants": "No users yet.",
+    "roles": {
+      "admin": "Administrator",
+      "operator": "Operator",
+      "viewer": "Read-only"
+    }
   },
   "policies": {
-    "title": "Policies (consultant × client)",
+    "title": "Policies",
+    "subtitle": "Who reaches what. Each row authorizes a user to reach a client network.",
     "create": "New policy",
-    "consultant": "Consultant",
+    "consultant": "User",
     "client": "Client",
     "scope_kind": "Scope kind",
     "scope_value": "Scope value",
     "expires_at": "Expires at",
-    "no_policies": "No policies yet."
+    "no_policies": "No policies yet.",
+    "scope_kinds": {
+      "full": "Full access",
+      "subnet": "Subnet",
+      "host": "Single host"
+    }
   },
   "audit": {
     "title": "Audit",
+    "subtitle": "Hash-chained event log. LGPD/SOC2-friendly.",
     "event_type": "Event type",
     "actor": "Actor",
     "occurred_at": "When",
     "payload": "Detail",
-    "filter_event_type": "Filter by type",
-    "filter_consultant": "Filter by consultant",
+    "filter_event_type": "Filter by type (e.g. tunnel.)",
+    "filter_consultant": "Filter by user",
     "no_events": "No events."
   },
   "system": {
     "title": "System",
+    "subtitle": "Aggregator status, version and maintenance.",
     "version": "Version",
     "license": "License",
     "health": "Health",
     "regenerate_dns": "Regenerate DNS Corefile",
-    "regenerated": "Corefile regenerated and CoreDNS reloaded."
+    "regenerated": "Corefile regenerated and CoreDNS reloaded.",
+    "uptime": "Operational",
+    "endpoint": "API endpoint"
   }
 }

@@ -57,8 +57,12 @@ exec openvpn \
     --config "$TUNNEL_CONFIG_PATH" \
     --management "$TUNNEL_OPENVPN_MGMT_SOCKET" unix \
     --management-query-passwords \
-    --management-hold \
     --auth-nocache \
     --verb 3 \
     $dev_args \
     $auth_args
+# (removido --management-hold: o tunnel-controller não emite 'hold release',
+# então openvpn ficava em "Need hold release from management interface,
+# waiting..." pra sempre. Sem hold, openvpn conecta direto, e o controller
+# usa o management socket pra status/OTP/restart como antes.
+# Item §11.5 do MANUAL.md.)

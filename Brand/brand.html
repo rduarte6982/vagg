@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8"/>
+<title>VAGG — Brand</title>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap"/>
+<link rel="stylesheet" href="brand.css"/>
+<style>
+  body { padding: 64px 80px; }
+  .wrap { max-width: 1100px; margin: 0 auto; }
+  h1 { font-family: var(--font-mono); font-weight: 600; font-size: 56px; letter-spacing: -0.02em; margin: 0 0 8px; }
+  h2 { font-family: var(--font-sans); font-weight: 600; font-size: 14px; margin: 0 0 16px; color: var(--ink-2); text-transform: uppercase; letter-spacing: 0.14em; font-family: var(--font-mono); }
+  .lead { font-size: 18px; color: var(--ink-2); max-width: 640px; line-height: 1.6; margin: 16px 0 56px; }
+  section { padding: 36px 0; border-top: 1px solid var(--line); }
+  .grid { display: grid; gap: 18px; }
+  .grid-3 { grid-template-columns: repeat(3, 1fr); }
+  .grid-4 { grid-template-columns: repeat(4, 1fr); }
+  .swatch {
+    border-radius: var(--r-3); padding: 18px; height: 130px;
+    display: flex; flex-direction: column; justify-content: space-between;
+    border: 1px solid var(--line);
+  }
+  .swatch .lbl { font-family: var(--font-mono); font-size: 12px; opacity: .8; }
+  .swatch .hex { font-family: var(--font-mono); font-size: 12px; opacity: .65; }
+  .logo-tile {
+    border: 1px solid var(--line);
+    background: var(--bg-2);
+    border-radius: var(--r-3);
+    padding: 36px;
+    display: flex; align-items: center; justify-content: center;
+    gap: 14px;
+    min-height: 160px;
+  }
+  .logo-tile.paper { background: var(--paper); }
+  .logo-tile.paper .vagg-wordmark { color: var(--ink-on-paper); }
+  .logo-tile.signal { background: var(--signal); color: var(--signal-ink); }
+  .logo-tile.signal .vagg-wordmark { color: var(--signal-ink); }
+  .logo-tile.signal .vagg-wordmark .dot { color: var(--signal-ink); }
+  .logo-tile.signal .vagg-mark .node { fill: var(--signal-ink); }
+  .logo-tile.signal .vagg-mark .core { fill: #fff; }
+  .logo-tile.signal .vagg-mark .wire { stroke: var(--signal-ink); }
+  .logo-tile .vagg-mark { width: 44px; height: 44px; }
+  .logo-tile .vagg-wordmark { font-size: 24px; }
+  .type-row { display: flex; align-items: baseline; gap: 24px; padding: 18px 0; border-bottom: 1px dashed var(--line); }
+  .type-row .meta { width: 180px; color: var(--ink-3); font-family: var(--font-mono); font-size: 12px; }
+  .pill-row { display: flex; gap: 10px; flex-wrap: wrap; }
+  .principle { padding: 22px; background: var(--bg-2); border: 1px solid var(--line); border-radius: var(--r-3); }
+  .principle h3 { margin: 0 0 6px; font-size: 16px; }
+  .principle p  { margin: 0; color: var(--ink-2); font-size: 14px; line-height: 1.6; }
+  .principle .num { font-family: var(--font-mono); color: var(--signal); font-size: 12px; letter-spacing: .1em; }
+  .voice { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .voice div { padding: 18px; border-radius: var(--r-2); border: 1px solid var(--line); font-size: 14px; line-height: 1.55; }
+  .voice .yes { background: rgba(0,0,0,0); }
+  .voice .yes::before { content: "VAGG diz"; display: block; font-family: var(--font-mono); font-size: 11px; color: var(--signal); letter-spacing: .14em; margin-bottom: 8px; }
+  .voice .no  { color: var(--ink-3); }
+  .voice .no::before  { content: "VAGG não diz"; display: block; font-family: var(--font-mono); font-size: 11px; color: var(--ink-4); letter-spacing: .14em; margin-bottom: 8px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <span class="eyebrow">Brand · v1.0 · maio 2026</span>
+    <h1>VAGG<span style="color:var(--signal)">.</span></h1>
+    <p class="lead">A VPN que sua consultoria não precisa. Um agregador de túneis para times que vivem entre a rede de cinco clientes ao mesmo tempo — uma única conexão, escopo controlado, trilha de auditoria que você pode mostrar para o auditor do seu cliente.</p>
+  </header>
+
+  <section>
+    <h2>01 · Posicionamento</h2>
+    <div class="grid grid-3">
+      <div class="principle"><span class="num">PRINCÍPIO 01</span><h3>Invisível por design</h3><p>O consultor não sabe que existe. Conecta na VPN da empresa e a rede do cliente certo aparece.</p></div>
+      <div class="principle"><span class="num">PRINCÍPIO 02</span><h3>Auditável por construção</h3><p>Hash chain append-only. Toda conexão, toda rota, todo acesso. Pronto para LGPD, SOX, BACEN 4.658.</p></div>
+      <div class="principle"><span class="num">PRINCÍPIO 03</span><h3>Self-hosted, não SaaS</h3><p>Roda na sua infra, atrás da sua OpenVPN. Os dados do seu cliente final nunca saem da sua rede.</p></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>02 · Logo</h2>
+    <p class="lead" style="margin: 0 0 24px;">Quatro nós roteando para um único agregador. A geometria conta a história em 28 pixels.</p>
+    <div class="grid grid-3">
+      <div class="logo-tile">
+        <svg viewBox="0 0 28 28" class="vagg-mark"><circle class="node" cx="4" cy="4" r="2"/><circle class="node" cx="24" cy="4" r="2"/><circle class="node" cx="4" cy="24" r="2"/><circle class="node" cx="24" cy="24" r="2"/><path class="wire" d="M4 4 L14 14"/><path class="wire" d="M24 4 L14 14"/><path class="wire" d="M4 24 L14 14"/><path class="wire" d="M24 24 L14 14"/><rect class="core" x="10" y="10" width="8" height="8" rx="1.6"/></svg>
+        <span class="vagg-wordmark">vagg<span class="dot">.</span></span>
+      </div>
+      <div class="logo-tile paper">
+        <svg viewBox="0 0 28 28" class="vagg-mark on-paper"><circle class="node" cx="4" cy="4" r="2"/><circle class="node" cx="24" cy="4" r="2"/><circle class="node" cx="4" cy="24" r="2"/><circle class="node" cx="24" cy="24" r="2"/><path class="wire" d="M4 4 L14 14"/><path class="wire" d="M24 4 L14 14"/><path class="wire" d="M4 24 L14 14"/><path class="wire" d="M24 24 L14 14"/><rect class="core" x="10" y="10" width="8" height="8" rx="1.6"/></svg>
+        <span class="vagg-wordmark">vagg<span class="dot">.</span></span>
+      </div>
+      <div class="logo-tile signal">
+        <svg viewBox="0 0 28 28" class="vagg-mark"><circle class="node" cx="4" cy="4" r="2"/><circle class="node" cx="24" cy="4" r="2"/><circle class="node" cx="4" cy="24" r="2"/><circle class="node" cx="24" cy="24" r="2"/><path class="wire" d="M4 4 L14 14"/><path class="wire" d="M24 4 L14 14"/><path class="wire" d="M4 24 L14 14"/><path class="wire" d="M24 24 L14 14"/><rect class="core" x="10" y="10" width="8" height="8" rx="1.6"/></svg>
+        <span class="vagg-wordmark">vagg<span class="dot">.</span></span>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>03 · Paleta</h2>
+    <div class="grid grid-4">
+      <div class="swatch" style="background:#0b0d10; color:#e8eaed"><span class="lbl">Ink / bg</span><span class="hex">#0b0d10</span></div>
+      <div class="swatch" style="background:#161a1f; color:#e8eaed"><span class="lbl">Surface</span><span class="hex">#161a1f</span></div>
+      <div class="swatch" style="background:#21262d; color:#e8eaed"><span class="lbl">Line</span><span class="hex">#21262d</span></div>
+      <div class="swatch" style="background:#f6f5f1; color:#15171b; border-color:#dedcd3"><span class="lbl">Paper</span><span class="hex">#f6f5f1</span></div>
+      <div class="swatch" style="background: oklch(78% 0.16 162); color:#103127"><span class="lbl">Signal · accent</span><span class="hex">oklch(78% .16 162)</span></div>
+      <div class="swatch" style="background: oklch(78% 0.14 75); color:#2d1f00"><span class="lbl">Warn</span><span class="hex">oklch(78% .14 75)</span></div>
+      <div class="swatch" style="background: oklch(70% 0.18 25); color:#3a0c08"><span class="lbl">Critical</span><span class="hex">oklch(70% .18 25)</span></div>
+      <div class="swatch" style="background:#7a808a; color:#0b0d10"><span class="lbl">Ink-3</span><span class="hex">#7a808a</span></div>
+    </div>
+    <p class="lead" style="margin-top: 24px;">Único acento, uma cor: <span class="mono" style="color:var(--signal)">signal-green</span>. É a cor do LED verde do switch — calma, técnica, viva. Nunca usar gradientes. Nunca dois acentos competindo.</p>
+  </section>
+
+  <section>
+    <h2>04 · Tipografia</h2>
+    <div class="type-row"><span class="meta">Display · Mono</span><span style="font-family:var(--font-mono); font-size:48px; font-weight:600; letter-spacing:-.02em">JetBrains Mono</span></div>
+    <div class="type-row"><span class="meta">UI · Sans</span><span style="font-family:var(--font-sans); font-size:32px; font-weight:600">Inter</span></div>
+    <div class="type-row"><span class="meta">Body · Sans 400</span><span style="font-family:var(--font-sans); font-size:18px">A consultora opera 38 túneis em 12 ambientes de cliente sem reler nenhuma senha.</span></div>
+    <div class="type-row"><span class="meta">Caption · Mono 11</span><span class="mono" style="font-size:11px; letter-spacing:.14em; text-transform:uppercase; color:var(--ink-3)">SESSION · 14:02:08 UTC · TRACE 9f24a1</span></div>
+  </section>
+
+  <section>
+    <h2>05 · Componentes</h2>
+    <div class="pill-row">
+      <span class="pill ok">tunnel · up</span>
+      <span class="pill warn">policy · expira em 3d</span>
+      <span class="pill crit">tunnel · down</span>
+      <span class="pill">idle</span>
+    </div>
+    <div style="display:flex; gap:12px; margin-top:20px;">
+      <button class="btn btn-primary">Conectar túnel</button>
+      <button class="btn btn-ghost">Ver logs</button>
+      <button class="btn btn-quiet">Cancelar</button>
+    </div>
+  </section>
+
+  <section>
+    <h2>06 · Voz</h2>
+    <div class="voice">
+      <div class="yes">Direto, técnico, sem firula. Mostra o que faz e o que não faz. Usa números reais. Fala "túnel" não "experiência conectada". Nomeia clientes como pessoas que pagam, não como "stakeholders".</div>
+      <div class="no">Sem "revolução do trabalho remoto". Sem "potencialize sua produtividade". Sem emojis no produto. Sem stock photo de gente sorrindo na frente de um notebook.</div>
+    </div>
+  </section>
+
+</div>
+</body>
+</html>

@@ -10,6 +10,15 @@
 #   4. Spawnar openconnect em background para que o controller fique no
 #      foreground; openconnect grava PID em $TUNNEL_PID_FILE.
 #
+# Modos de auth:
+#  - Sem MFA (TUNNEL_REQUIRES_OTP unset/false):
+#      stdin recebe só a senha. openconnect autentica e termina o input.
+#  - Com MFA (TUNNEL_REQUIRES_OTP=true):
+#      stdin recebe senha + linha vinda do FIFO /run/otp.pipe (bloqueante
+#      até alguém escrever — orchestrator faz isso via send_otp). O FIFO
+#      permanece aberto, então em reconexões (--reconnect-timeout) o
+#      orchestrator pode empurrar um novo código TOTP no mesmo pipe.
+#
 set -eu
 
 log() { echo "{\"ts\":\"$(date -u +%FT%TZ)\",\"src\":\"entrypoint\",\"msg\":\"$*\"}"; }
@@ -57,15 +66,31 @@ fi
 
 # Spawna openconnect em background; --background grava o pid no --pid-file.
 log "starting openconnect (pid-file=$TUNNEL_PID_FILE)"
-printf '%s\n' "$password" | openconnect \
-    $proto_arg \
-    --user "${TUNNEL_USERNAME:-}" \
-    --passwd-on-stdin \
-    --pid-file "$TUNNEL_PID_FILE" \
-    --background \
-    --syslog \
-    $iface_args \
-    "$SERVER" &
+if [ "${TUNNEL_REQUIRES_OTP:-}" = "true" ]; then
+    log "MFA mode — pipeando FIFO $TUNNEL_OTP_PIPE no stdin do openconnect"
+    # Stream stdin: senha (imediato) + linha vinda do FIFO (bloqueia open()
+    # até alguém escrever). O sub-shell mantém o FIFO aberto pra que prompts
+    # subsequentes (reconexão) também recebam código fresh.
+    ( printf '%s\n' "$password"; cat "$TUNNEL_OTP_PIPE"; ) | openconnect \
+        $proto_arg \
+        --user "${TUNNEL_USERNAME:-}" \
+        --passwd-on-stdin \
+        --pid-file "$TUNNEL_PID_FILE" \
+        --background \
+        --syslog \
+        $iface_args \
+        "$SERVER" &
+else
+    printf '%s\n' "$password" | openconnect \
+        $proto_arg \
+        --user "${TUNNEL_USERNAME:-}" \
+        --passwd-on-stdin \
+        --pid-file "$TUNNEL_PID_FILE" \
+        --background \
+        --syslog \
+        $iface_args \
+        "$SERVER" &
+fi
 openconnect_pid=$!
 
 trap 'kill -TERM "$openconnect_pid" 2>/dev/null || true; exit 0' TERM INT

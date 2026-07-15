@@ -28,7 +28,14 @@ Credenciais: `/config/password` (mode 600). Username vai em `TUNNEL_USERNAME`.
 
 ## OTP / MFA
 
-`tunnel-controller` envia o OTP para `TUNNEL_OTP_PIPE`. Para Phase 5 o `entrypoint.sh` cria o FIFO mas **não** o redireciona para o stdin do openconnect — autenticação além de senha estática requer trabalho de plumbing adicional (Duo push via `--script`, TOTP via `--token-mode`, etc). Trabalho previsto em fase posterior.
+Quando `TUNNEL_REQUIRES_OTP=true`, o entrypoint pipa o FIFO `TUNNEL_OTP_PIPE` no stdin do openconnect (depois da senha). O `tunnel-controller` recebe `{"cmd":"otp","code":"123456"}` via socket de controle e escreve no FIFO — bloqueante: a primeira tentativa de auth fica parada até o orchestrator empurrar o código.
+
+Dois modos suportados pelo aggregator:
+
+- **Auto-TOTP (recomendado, zero-touch):** o admin cadastra o seed RFC 6238 do user da VPN em `PUT /api/v1/clients/{id}/totp` (cifrado at-rest com Fernet). O orchestrator gera código fresh a cada connect/reconnect e empurra no FIFO automaticamente. Compatível com Microsoft Authenticator, Google Authenticator, FortiToken, 1Password, etc.
+- **Manual:** sem seed cadastrado, o orchestrator espera `POST /api/v1/clients/{id}/otp` com o código digitado pelo admin na UI. Necessário pra Duo Push / SMS / outros canais que não cabem em TOTP RFC 6238.
+
+Pra SAML/SSO (Azure AD com Microsoft Authenticator push), usar o fluxo paralelo de captura de cookie em `tunnels/saml-portal/` + `tunnels/openconnect-saml/` (browser remoto + mitmproxy).
 
 ## Limitações conhecidas
 

@@ -1,39 +1,24 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
+import { createContext, useContext, type ReactNode } from 'react';
 
-type Theme = 'light' | 'dark';
+/**
+ * Light-only no-op preservado para retrocompatibilidade. O design router
+ * (TP-Link) usa apenas o tema claro; mantemos a API antes utilizada por
+ * componentes externos para não quebrar imports.
+ */
 
-const THEME_KEY = 'vagg.theme';
+type Theme = 'light';
 
 interface ThemeState {
   theme: Theme;
   toggle: () => void;
 }
 
-const ThemeContext = createContext<ThemeState | undefined>(undefined);
+const ThemeContext = createContext<ThemeState>({ theme: 'light', toggle: () => {} });
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  const [theme, setTheme] = useState<Theme>(() => {
-    const stored = localStorage.getItem(THEME_KEY);
-    if (stored === 'dark' || stored === 'light') return stored;
-    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-  });
-
-  useEffect(() => {
-    document.documentElement.classList.toggle('dark', theme === 'dark');
-    localStorage.setItem(THEME_KEY, theme);
-  }, [theme]);
-
-  return (
-    <ThemeContext.Provider
-      value={{ theme, toggle: () => setTheme((t) => (t === 'dark' ? 'light' : 'dark')) }}
-    >
-      {children}
-    </ThemeContext.Provider>
-  );
+  return <ThemeContext.Provider value={{ theme: 'light', toggle: () => {} }}>{children}</ThemeContext.Provider>;
 }
 
 export function useTheme(): ThemeState {
-  const ctx = useContext(ThemeContext);
-  if (!ctx) throw new Error('useTheme must be used inside <ThemeProvider>');
-  return ctx;
+  return useContext(ThemeContext);
 }

@@ -518,6 +518,38 @@ def _log_all_set_cookies(flow_host: str, path: str, set_cookie_headers: list[str
         pass  # log é diagnóstico — falha não é fatal
 
 
+def request(flow: http.HTTPFlow) -> None:
+    """Intercepta requests do Firefox.
+
+    1. Pra `login.microsoftonline.com`, adiciona `prompt=login` se ausente.
+       Força Microsoft a pedir credenciais + push em vez de fazer SSO
+       silencioso. Importante porque cookies SAML capturados via SSO
+       silencioso são frequentemente rejeitados pelo gateway FortiGate
+       (`Set-Cookie: SVPNCOOKIE=; expires=1984` no primeiro uso), enquanto
+       cookies obtidos via push fresh funcionam.
+
+    2. Pro gateway VPN (FortiGate), forja UA `FortiSSLVPNclient/7.4.0.1310`.
+       FortiGates com host-check habilitado fecham a conexão no
+       `POST /remote/saml/login` quando o UA é de browser puro — mas
+       respeitam o flag `?redirect=1` se o UA for FortiClient. Como mitm
+       é proxy explícito do Firefox, podemos reescrever o UA na hora.
+    """
+    host = flow.request.pretty_host.lower()
+    gw_host = (ctx.options.vagg_gateway_host or "").lower().split(":", 1)[0]
+    if gw_host and gw_host in host:
+        flow.request.headers["User-Agent"] = "FortiSSLVPNclient/7.4.0.1310"
+        log.info(f"[vagg] UA spoof FortiClient → {flow.request.method} {flow.request.path[:80]}")
+        return
+
+    if "login.microsoftonline.com" not in host:
+        return
+    if "prompt=" in flow.request.url:
+        return
+    sep = "&" if "?" in flow.request.path else "?"
+    flow.request.path = flow.request.path + sep + "prompt=login"
+    log.info(f"[vagg] injected prompt=login → {flow.request.path[:120]}")
+
+
 def response(flow: http.HTTPFlow) -> None:
     global _followup_done
     target_host = (ctx.options.vagg_gateway_host or "").lower()

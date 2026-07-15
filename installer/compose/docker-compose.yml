@@ -19,6 +19,12 @@ services:
     cap_add:
       - NET_ADMIN
       - NET_RAW
+    # Adiciona ao container o GID do grupo `docker` do host (988 no Ubuntu),
+    # pra o user vagg (1000) conseguir abrir /var/run/docker.sock que é
+    # rw para root:docker. Sem isso, todas as chamadas à Docker API falham
+    # com "Permission denied" e o status fica como `errored` na UI.
+    group_add:
+      - "988"
     volumes:
       - /var/lib/vagg/db:/var/lib/vagg/db
       - /var/lib/vagg/clients:/var/lib/vagg/clients
@@ -46,8 +52,24 @@ services:
     image: ${VAGG_REGISTRY:-ghcr.io/rduarte6982/vagg}/ui:${VAGG_VERSION:-latest}
     restart: unless-stopped
     ports:
-      - "443:80"   # TLS termination is upstream of compose (caddy/nginx-proxy
-                   # ou direto o nginx do container com cert montado)
+      - "80:80"     # HTTP plano (painel + api)
+      - "443:443"   # HTTPS com self-signed cert (necessário pro /saml-portal/)
+    # vagg-core roda em network_mode: host, então não é acessível via DNS do
+    # compose. host-gateway dá ao container acesso ao loopback do host.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      # Binários distribuíveis (instalador VAGG Client, etc) — exposto em
+      # /downloads/ pelo nginx.
+      - /var/lib/vagg/downloads:/var/www/downloads:ro
+      # Self-signed cert pra TLS na porta 443 (necessário pro KasmVNC do
+      # /saml-portal/ funcionar — WebCodecs/WebRTC exige secure context).
+      # Gerar uma vez:
+      #   sudo openssl req -x509 -newkey rsa:2048 -keyout /etc/vagg/tls/key.pem
+      #     -out /etc/vagg/tls/cert.pem -days 3650 -nodes
+      #     -subj "/CN=192.168.68.102"
+      #     -addext "subjectAltName=IP:192.168.68.102"
+      - /etc/vagg/tls:/etc/nginx/tls:ro
     depends_on:
       - vagg-core
     healthcheck:

@@ -1,0 +1,1020 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>VAGG · ROIT · Apresentação Interna</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --navy:   #14283b;
+    --navy-2: #1b3148;
+    --navy-3: #243b56;
+    --navy-4: #2d4663;
+    --gold:   #d4a943;
+    --gold-2: #b88c2d;
+    --gold-dim: rgba(212,169,67,0.12);
+    --ink:    #f1ece1;
+    --ink-2:  #c9c2b3;
+    --ink-3:  #8b8775;
+    --ink-4:  #5a5749;
+    --paper:  #f6f5f1;
+    --signal-ok:   #5fb38e;
+    --signal-warn: #d4a943;
+    --signal-err:  #c47171;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0;
+    background: var(--navy);
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    color: var(--ink);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+  .mono { font-family: 'JetBrains Mono', ui-monospace, monospace; }
+
+  /* slide chrome */
+  .deck { display: flex; flex-direction: column; }
+  .slide {
+    width: 100%;
+    min-height: 100vh;
+    padding: 72px 96px 96px;
+    display: flex; flex-direction: column;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+    position: relative;
+    page-break-after: always;
+    break-after: page;
+  }
+  .slide.cover  { background: linear-gradient(135deg, var(--navy) 0%, var(--navy-3) 100%); justify-content: space-between; }
+  .slide.alt    { background: var(--navy-2); }
+  .slide.paper  { background: var(--paper); color: var(--navy); }
+  .slide.paper h1, .slide.paper h2, .slide.paper h3 { color: var(--navy); }
+  .slide.paper p, .slide.paper li { color: #2c3e50; }
+  .slide.paper .muted { color: #5a5749; }
+  .slide.paper .tag { color: var(--gold-2); }
+  .slide.paper .card { background: rgba(20,40,59,0.04); border-color: rgba(212,169,67,0.35); }
+
+  .num {
+    position: absolute; top: 28px; right: 48px;
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 12px; color: var(--gold); letter-spacing: 0.18em;
+    font-weight: 600;
+  }
+  .branding {
+    position: absolute; top: 28px; left: 48px;
+    display: flex; gap: 10px; align-items: center;
+  }
+  .branding .mark { width: 26px; height: 26px; }
+  .branding .wordmark { font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 600; color: var(--ink); letter-spacing: 0.04em; }
+  .branding .wordmark .dot { color: var(--gold); }
+  .branding .by-roit { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--ink-3); letter-spacing: 0.18em; margin-left: 14px; padding-left: 14px; border-left: 1px solid var(--ink-4); }
+
+  .tag {
+    display: inline-block;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px; letter-spacing: 0.28em; font-weight: 600;
+    color: var(--gold); margin-bottom: 18px; text-transform: uppercase;
+  }
+  h1 { font-size: 64px; line-height: 1.04; margin: 0 0 28px 0; font-weight: 700; letter-spacing: -0.022em; text-wrap: balance; }
+  h1.huge { font-size: 96px; }
+  h2 { font-size: 42px; line-height: 1.12; margin: 0 0 28px 0; font-weight: 700; letter-spacing: -0.018em; text-wrap: balance; }
+  h3 { font-size: 20px; margin: 0 0 12px 0; font-weight: 600; letter-spacing: -0.005em; }
+  h4 { font-size: 14px; margin: 0 0 10px 0; font-weight: 600; color: var(--gold); text-transform: uppercase; letter-spacing: 0.14em; }
+  p, li { font-size: 17px; line-height: 1.6; color: var(--ink-2); margin: 0 0 12px 0; }
+  .lead { font-size: 21px; line-height: 1.55; color: var(--ink); max-width: 1100px; }
+  .muted { color: var(--ink-3); }
+  .ac { color: var(--gold); }
+  ul { padding-left: 24px; margin: 0; }
+  li { padding: 4px 0; }
+  li::marker { color: var(--gold); }
+
+  /* layouts */
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 56px; align-items: start; }
+  .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 28px; }
+  .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; }
+
+  .card {
+    background: rgba(255,255,255,0.025);
+    border: 1px solid rgba(212,169,67,0.18);
+    border-radius: 12px;
+    padding: 24px;
+  }
+  .card h3 { color: var(--ink); margin-bottom: 12px; }
+  .card.feature h3::before {
+    content: '';
+    display: inline-block;
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--gold);
+    margin-right: 10px;
+    vertical-align: middle;
+  }
+
+  /* metric block */
+  .metric {
+    padding: 32px 28px;
+    border: 1px solid rgba(212,169,67,0.22);
+    border-radius: 14px;
+    background: rgba(212,169,67,0.04);
+  }
+  .metric .num-big {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 62px;
+    font-weight: 700;
+    letter-spacing: -0.025em;
+    color: var(--gold);
+    line-height: 1;
+  }
+  .metric .num-big .u { font-size: 22px; color: var(--ink-3); margin-left: 6px; }
+  .metric .lb { font-size: 15px; color: var(--ink-2); line-height: 1.4; margin-top: 12px; }
+
+  /* screenshot */
+  img.shot {
+    width: 100%;
+    border-radius: 10px;
+    box-shadow: 0 24px 60px -20px rgba(0,0,0,0.6), 0 2px 8px rgba(0,0,0,0.25);
+    border: 1px solid rgba(255,255,255,0.06);
+    display: block;
+  }
+  .shot-cap {
+    margin-top: 12px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: var(--ink-3);
+    letter-spacing: 0.04em;
+  }
+
+  /* status pill */
+  .pill {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    padding: 4px 10px;
+    border-radius: 999px;
+    background: rgba(212,169,67,0.1);
+    color: var(--gold);
+    border: 1px solid rgba(212,169,67,0.3);
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+  }
+  .pill.warn { background: rgba(212,169,67,0.18); color: var(--gold); }
+  .pill.ok { background: rgba(95,179,142,0.15); color: var(--signal-ok); border-color: rgba(95,179,142,0.4); }
+
+  /* diagram */
+  .arch { width: 100%; margin: 24px 0; }
+  .arch svg { width: 100%; height: auto; max-height: 580px; }
+  .arch text { font-family: 'Inter', sans-serif; }
+
+  /* compare table */
+  .compare {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 15px;
+    margin-top: 16px;
+  }
+  .compare th, .compare td {
+    text-align: left;
+    padding: 14px 16px;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+  }
+  .compare th {
+    color: var(--gold);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    font-weight: 600;
+  }
+  .compare tr td:first-child {
+    color: var(--ink);
+    font-weight: 500;
+  }
+  .compare .yes { color: var(--signal-ok); font-family: 'JetBrains Mono', monospace; }
+  .compare .no { color: var(--ink-4); font-family: 'JetBrains Mono', monospace; }
+  .slide.paper .compare th { color: var(--gold-2); }
+  .slide.paper .compare th, .slide.paper .compare td { border-bottom-color: rgba(20,40,59,0.1); }
+
+  /* Windows client mockup */
+  .winapp {
+    width: 100%; max-width: 480px;
+    background: #0b0d10;
+    border: 1px solid #21262d;
+    border-radius: 14px;
+    box-shadow: 0 24px 60px -20px rgba(0,0,0,0.6);
+    overflow: hidden;
+    color: #e8eaed;
+    font-family: 'Inter', sans-serif;
+  }
+  .winapp .titlebar {
+    background: #161a1f;
+    padding: 8px 14px;
+    display: flex; align-items: center; gap: 8px;
+    font-size: 11px; color: #7a808a;
+    border-bottom: 1px solid #21262d;
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .winapp .titlebar .dots { display: flex; gap: 6px; }
+  .winapp .titlebar .dot { width: 10px; height: 10px; border-radius: 50%; background: #2c333b; }
+  .winapp .body { padding: 22px; }
+  .winapp .head {
+    display: flex; justify-content: space-between; align-items: flex-start;
+    margin-bottom: 18px;
+  }
+  .winapp .head .id .name { font-family: 'JetBrains Mono', monospace; font-size: 16px; font-weight: 600; }
+  .winapp .head .id .name .dot { color: var(--gold); }
+  .winapp .head .id .sub { font-family: 'JetBrains Mono', monospace; font-size: 9px; color: #7a808a; letter-spacing: 0.16em; text-transform: uppercase; margin-top: 4px; }
+  .winapp .head .actions { display: flex; gap: 6px; }
+  .winapp .head .btn-icon { width: 28px; height: 28px; border-radius: 6px; border: 1px solid #2c333b; background: transparent; color: #b6bbc2; display: inline-flex; align-items: center; justify-content: center; font-size: 11px; }
+  .winapp .status-block {
+    background: #111418;
+    border: 1px solid #21262d;
+    border-radius: 10px;
+    padding: 14px;
+    margin-bottom: 14px;
+  }
+  .winapp .led {
+    display: inline-block; width: 8px; height: 8px; border-radius: 50%;
+    background: var(--signal-ok);
+    box-shadow: 0 0 8px var(--signal-ok);
+    margin-right: 8px;
+  }
+  .winapp .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 10px; }
+  .winapp .stat { background: #161a1f; border: 1px solid #21262d; border-radius: 6px; padding: 8px 10px; }
+  .winapp .stat .k { font-family: 'JetBrains Mono', monospace; font-size: 9px; color: #7a808a; text-transform: uppercase; letter-spacing: 0.14em; }
+  .winapp .stat .v { font-size: 16px; font-weight: 600; margin-top: 4px; }
+  .winapp .actions-row { display: flex; gap: 8px; margin-top: 12px; }
+  .winapp .btn-prim { flex: 1; background: var(--gold); color: #1a1a1a; border: none; border-radius: 6px; padding: 8px 12px; font-size: 12px; font-weight: 600; }
+  .winapp .btn-sec { background: transparent; border: 1px solid #2c333b; color: #b6bbc2; border-radius: 6px; padding: 8px 12px; font-size: 12px; }
+  .winapp .clients-block { background: #111418; border: 1px solid #21262d; border-radius: 10px; }
+  .winapp .clients-block .title { padding: 12px 14px 8px; border-bottom: 1px solid #21262d; font-size: 13px; font-weight: 600; }
+  .winapp .clients-block .row { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-bottom: 1px solid #21262d; font-size: 12px; }
+  .winapp .clients-block .row:last-child { border-bottom: none; }
+  .winapp .clients-block .row .nm { flex: 1; }
+  .winapp .clients-block .row .cidr { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: #7a808a; }
+  .winapp .clients-block .led-tiny { width: 6px; height: 6px; border-radius: 50%; background: var(--signal-ok); box-shadow: 0 0 5px var(--signal-ok); }
+  .winapp .clients-block .led-off { background: #2c333b; box-shadow: none; }
+
+  /* dl-pair (definition list) */
+  dl.pair { margin: 0; }
+  dl.pair > div { display: grid; grid-template-columns: 240px 1fr; gap: 24px; padding: 14px 0; border-bottom: 1px dashed rgba(255,255,255,0.07); }
+  dl.pair > div:last-child { border-bottom: none; }
+  dl.pair dt { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--gold); text-transform: uppercase; letter-spacing: 0.14em; font-weight: 600; }
+  dl.pair dd { margin: 0; font-size: 16px; color: var(--ink-2); line-height: 1.55; }
+  .slide.paper dl.pair > div { border-bottom-color: rgba(20,40,59,0.1); }
+  .slide.paper dl.pair dt { color: var(--gold-2); }
+  .slide.paper dl.pair dd { color: #2c3e50; }
+
+  /* warning banner */
+  .banner {
+    border-radius: 10px;
+    padding: 16px 22px;
+    margin: 24px 0;
+    display: flex; gap: 16px; align-items: flex-start;
+    font-size: 15px;
+  }
+  .banner.beta { background: rgba(212,169,67,0.1); border: 1px solid rgba(212,169,67,0.4); }
+  .banner.beta strong { color: var(--gold); }
+
+  /* utilities */
+  .mt-12 { margin-top: 48px; }
+  .mt-8 { margin-top: 32px; }
+  .mt-4 { margin-top: 16px; }
+  .mb-4 { margin-bottom: 16px; }
+  .center { text-align: center; }
+  .flex-grow { flex-grow: 1; }
+
+  /* print */
+  @media print {
+    @page { size: 1600px 900px; margin: 0; }
+    html, body { background: var(--navy); }
+    .slide {
+      min-height: 0; height: 900px;
+      page-break-after: always; break-after: page;
+      padding: 64px 80px 80px;
+    }
+  }
+</style>
+</head>
+<body>
+<div class="deck">
+
+<!-- 01 COVER -->
+<section class="slide cover">
+  <div class="branding">
+    <svg class="mark" viewBox="0 0 28 28">
+      <circle cx="4" cy="4" r="2" fill="#c9c2b3"/>
+      <circle cx="24" cy="4" r="2" fill="#c9c2b3"/>
+      <circle cx="4" cy="24" r="2" fill="#c9c2b3"/>
+      <circle cx="24" cy="24" r="2" fill="#c9c2b3"/>
+      <path d="M4 4 L14 14" stroke="#8b8775" stroke-width="1.4" fill="none"/>
+      <path d="M24 4 L14 14" stroke="#8b8775" stroke-width="1.4" fill="none"/>
+      <path d="M4 24 L14 14" stroke="#8b8775" stroke-width="1.4" fill="none"/>
+      <path d="M24 24 L14 14" stroke="#8b8775" stroke-width="1.4" fill="none"/>
+      <rect x="10" y="10" width="8" height="8" rx="1.6" fill="#d4a943"/>
+    </svg>
+    <span class="wordmark">vagg<span class="dot">.</span></span>
+    <span class="by-roit">BY ROIT</span>
+  </div>
+  <div class="num">01 / 14</div>
+
+  <div style="margin-top: auto;">
+    <span class="tag">apresentação interna · time roit</span>
+    <h1 class="huge">vagg<span class="ac">.</span></h1>
+    <h2 style="margin-top: 24px; color: var(--ink-2); font-weight: 500;">Um único acesso para todas as VPNs dos clientes</h2>
+    <p class="lead mt-4" style="max-width: 900px;">
+      O agregador de VPNs que substitui dezenas de clientes instalados, planilhas de
+      senhas e atritos diários por uma camada central, auditável e governada pela ROIT.
+    </p>
+  </div>
+
+  <footer style="display: flex; justify-content: space-between; align-items: flex-end; margin-top: 64px;">
+    <div>
+      <div class="mono" style="font-size: 11px; color: var(--ink-3); letter-spacing: 0.18em; text-transform: uppercase;">Versão</div>
+      <div class="mono" style="font-size: 18px; color: var(--gold); margin-top: 6px;">0.1.0 · pré-MVP</div>
+    </div>
+    <div>
+      <div class="mono" style="font-size: 11px; color: var(--ink-3); letter-spacing: 0.18em; text-transform: uppercase;">Status</div>
+      <div class="mono" style="font-size: 18px; color: var(--gold); margin-top: 6px;">Estabilização ativa</div>
+    </div>
+    <div>
+      <div class="mono" style="font-size: 11px; color: var(--ink-3); letter-spacing: 0.18em; text-transform: uppercase;">Owner</div>
+      <div class="mono" style="font-size: 18px; color: var(--ink); margin-top: 6px;">ROIT · Tech</div>
+    </div>
+  </footer>
+</section>
+
+<!-- 02 — O PROBLEMA -->
+<section class="slide alt">
+  <div class="branding">
+    <svg class="mark" viewBox="0 0 28 28"><circle cx="4" cy="4" r="2" fill="#c9c2b3"/><circle cx="24" cy="4" r="2" fill="#c9c2b3"/><circle cx="4" cy="24" r="2" fill="#c9c2b3"/><circle cx="24" cy="24" r="2" fill="#c9c2b3"/><path d="M4 4 L14 14" stroke="#8b8775" stroke-width="1.4" fill="none"/><path d="M24 4 L14 14" stroke="#8b8775" stroke-width="1.4" fill="none"/><path d="M4 24 L14 14" stroke="#8b8775" stroke-width="1.4" fill="none"/><path d="M24 24 L14 14" stroke="#8b8775" stroke-width="1.4" fill="none"/><rect x="10" y="10" width="8" height="8" rx="1.6" fill="#d4a943"/></svg>
+    <span class="wordmark">vagg<span class="dot">.</span></span>
+    <span class="by-roit">BY ROIT</span>
+  </div>
+  <div class="num">02 / 14</div>
+
+  <span class="tag">o problema</span>
+  <h1>Quantas VPNs cada consultor já instala?</h1>
+  <p class="lead">Cada cliente da ROIT tem sua VPN, suas credenciais, seu MFA e — muitas vezes — IPs sobrepostos.
+    O custo se acumula em três frentes:</p>
+
+  <div class="grid-3 mt-12">
+    <div class="metric">
+      <div class="num-big">15–30<span class="u">min/dia</span></div>
+      <div class="lb">perdidos por consultor alternando entre VPNs</div>
+    </div>
+    <div class="metric">
+      <div class="num-big">N<span class="u">clientes VPN</span></div>
+      <div class="lb">FortiClient, GlobalProtect, AnyConnect, OpenVPN — todos no notebook do time</div>
+    </div>
+    <div class="metric">
+      <div class="num-big">0<span class="u">audit central</span></div>
+      <div class="lb">sem trilha unificada de quem acessou qual rede do cliente</div>
+    </div>
+  </div>
+
+  <div class="mt-12 card">
+    <h3>Sintomas familiares</h3>
+    <ul>
+      <li>Senhas em planilhas, em Google Drive, em Notion — espalhadas e nunca rotacionadas em sincronia</li>
+      <li>Consultor que sai precisa ser revogado em N VPNs (e alguma sempre passa)</li>
+      <li>Cliente A e Cliente B usam <span class="mono ac">192.168.1.0/24</span> — bug obscuro de roteamento</li>
+      <li>MFA repetido em cada VPN, com push do Authenticator a cada reconexão</li>
+    </ul>
+  </div>
+</section>
+
+<!-- 03 — O QUE É VAGG -->
+<section class="slide">
+  <div class="branding">
+    <svg class="mark" viewBox="0 0 28 28"><circle cx="4" cy="4" r="2" fill="#c9c2b3"/><circle cx="24" cy="4" r="2" fill="#c9c2b3"/><circle cx="4" cy="24" r="2" fill="#c9c2b3"/><circle cx="24" cy="24" r="2" fill="#c9c2b3"/><path d="M4 4 L14 14" stroke="#8b8775" stroke-width="1.4" fill="none"/><path d="M24 4 L14 14" stroke="#8b8775" stroke-width="1.4" fill="none"/><path d="M4 24 L14 14" stroke="#8b8775" stroke-width="1.4" fill="none"/><path d="M24 24 L14 14" stroke="#8b8775" stroke-width="1.4" fill="none"/><rect x="10" y="10" width="8" height="8" rx="1.6" fill="#d4a943"/></svg>
+    <span class="wordmark">vagg<span class="dot">.</span></span>
+    <span class="by-roit">BY ROIT</span>
+  </div>
+  <div class="num">03 / 14</div>
+
+  <span class="tag">o que é</span>
+  <h1>Um agregador de VPNs dentro da ROIT.</h1>
+
+  <div class="grid-2 mt-8">
+    <div>
+      <p class="lead">O VAGG é um <span class="ac">servidor self-hosted</span> que mantém túneis persistentes
+        para todas as VPNs dos clientes. O consultor não instala mais nenhum cliente VPN específico —
+        usa apenas a VPN ROIT (que já existe).</p>
+
+      <h3 class="mt-12">O fluxo do consultor</h3>
+      <ol style="padding-left: 24px;">
+        <li>Conecta na VPN ROIT (mesma de sempre)</li>
+        <li>Abre o VAGG Client no notebook</li>
+        <li>Vê os clientes liberados conforme política</li>
+        <li>Acesso é instantâneo, sem segundo MFA</li>
+      </ol>
+    </div>
+
+    <div class="card feature">
+      <h3>Princípios de design</h3>
+      <ul>
+        <li><strong>Self-hosted ROIT</strong> — dados nunca saem da nossa rede</li>
+        <li><strong>Sem MITM nos túneis</strong> — não inspeciona tráfego dos clientes</li>
+        <li><strong>Não substitui</strong> a VPN ROIT — senta atrás dela</li>
+        <li><strong>RBAC por construção</strong> — default-deny</li>
+        <li><strong>Audit hash-chained</strong> — pronto pra LGPD</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- 04 — ARQUITETURA -->
+<section class="slide paper">
+  <div class="branding">
+    <svg class="mark" viewBox="0 0 28 28"><circle cx="4" cy="4" r="2" fill="#14283b"/><circle cx="24" cy="4" r="2" fill="#14283b"/><circle cx="4" cy="24" r="2" fill="#14283b"/><circle cx="24" cy="24" r="2" fill="#14283b"/><path d="M4 4 L14 14" stroke="#5a5749" stroke-width="1.4" fill="none"/><path d="M24 4 L14 14" stroke="#5a5749" stroke-width="1.4" fill="none"/><path d="M4 24 L14 14" stroke="#5a5749" stroke-width="1.4" fill="none"/><path d="M24 24 L14 14" stroke="#5a5749" stroke-width="1.4" fill="none"/><rect x="10" y="10" width="8" height="8" rx="1.6" fill="#b88c2d"/></svg>
+    <span class="wordmark" style="color: #14283b;">vagg<span class="dot" style="color: #b88c2d;">.</span></span>
+    <span class="by-roit" style="color: #5a5749; border-left-color: #b6bbc2;">BY ROIT</span>
+  </div>
+  <div class="num" style="color: #b88c2d;">04 / 14</div>
+
+  <span class="tag">arquitetura</span>
+  <h1>Como o agregador vê a rede.</h1>
+
+  <div class="arch">
+    <svg viewBox="0 0 1280 560" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+          <path d="M0,0 L10,5 L0,10 z" fill="#b88c2d"/>
+        </marker>
+        <marker id="arrow-dim" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+          <path d="M0,0 L10,5 L0,10 z" fill="#8b8775"/>
+        </marker>
+      </defs>
+
+      <!-- TIER 1: Consultor -->
+      <g>
+        <rect x="50" y="40" width="1180" height="100" rx="10" fill="rgba(20,40,59,0.04)" stroke="rgba(20,40,59,0.18)" stroke-dasharray="6,4"/>
+        <text x="70" y="68" font-size="13" font-weight="600" font-family="JetBrains Mono" fill="#b88c2d" letter-spacing="2">CONSULTORES · NOTEBOOK</text>
+        <g transform="translate(70, 86)">
+          <rect width="180" height="44" rx="6" fill="#14283b"/>
+          <text x="90" y="20" text-anchor="middle" font-size="13" font-weight="600" fill="#f1ece1">Consultor A</text>
+          <text x="90" y="36" text-anchor="middle" font-size="10" font-family="JetBrains Mono" fill="#d4a943">VAGG Client (Windows)</text>
+        </g>
+        <g transform="translate(270, 86)">
+          <rect width="180" height="44" rx="6" fill="#14283b"/>
+          <text x="90" y="20" text-anchor="middle" font-size="13" font-weight="600" fill="#f1ece1">Consultor B</text>
+          <text x="90" y="36" text-anchor="middle" font-size="10" font-family="JetBrains Mono" fill="#d4a943">VAGG Client (Windows)</text>
+        </g>
+        <g transform="translate(470, 86)">
+          <rect width="180" height="44" rx="6" fill="#14283b"/>
+          <text x="90" y="20" text-anchor="middle" font-size="13" font-weight="600" fill="#f1ece1">Consultor C</text>
+          <text x="90" y="36" text-anchor="middle" font-size="10" font-family="JetBrains Mono" fill="#d4a943">VAGG Client (Windows)</text>
+        </g>
+        <text x="685" y="115" font-size="22" fill="#8b8775">···</text>
+      </g>
+
+      <!-- arrow down -->
+      <line x1="640" y1="140" x2="640" y2="180" stroke="#b88c2d" stroke-width="2" marker-end="url(#arrow)"/>
+      <text x="660" y="165" font-size="12" font-family="JetBrains Mono" fill="#5a5749">VPN ROIT (corporativa)</text>
+
+      <!-- TIER 2: VAGG VM -->
+      <g>
+        <rect x="50" y="180" width="1180" height="170" rx="10" fill="rgba(212,169,67,0.08)" stroke="#b88c2d" stroke-width="2"/>
+        <text x="70" y="206" font-size="13" font-weight="600" font-family="JetBrains Mono" fill="#b88c2d" letter-spacing="2">VAGG SERVER · VM SELF-HOSTED NA ROIT</text>
+
+        <!-- core components -->
+        <g transform="translate(70, 225)">
+          <rect width="170" height="50" rx="6" fill="#14283b"/>
+          <text x="85" y="22" text-anchor="middle" font-size="13" font-weight="600" fill="#f1ece1">vagg-core</text>
+          <text x="85" y="38" text-anchor="middle" font-size="10" font-family="JetBrains Mono" fill="#d4a943">API · RBAC · audit</text>
+        </g>
+        <g transform="translate(255, 225)">
+          <rect width="170" height="50" rx="6" fill="#14283b"/>
+          <text x="85" y="22" text-anchor="middle" font-size="13" font-weight="600" fill="#f1ece1">vagg-ui</text>
+          <text x="85" y="38" text-anchor="middle" font-size="10" font-family="JetBrains Mono" fill="#d4a943">painel admin</text>
+        </g>
+        <g transform="translate(440, 225)">
+          <rect width="170" height="50" rx="6" fill="#14283b"/>
+          <text x="85" y="22" text-anchor="middle" font-size="13" font-weight="600" fill="#f1ece1">vagg-dns</text>
+          <text x="85" y="38" text-anchor="middle" font-size="10" font-family="JetBrains Mono" fill="#d4a943">CoreDNS split</text>
+        </g>
+        <g transform="translate(625, 225)">
+          <rect width="170" height="50" rx="6" fill="#14283b"/>
+          <text x="85" y="22" text-anchor="middle" font-size="13" font-weight="600" fill="#f1ece1">vagg-router</text>
+          <text x="85" y="38" text-anchor="middle" font-size="10" font-family="JetBrains Mono" fill="#d4a943">iptables · NAT</text>
+        </g>
+        <g transform="translate(810, 225)">
+          <rect width="200" height="50" rx="6" fill="#14283b"/>
+          <text x="100" y="22" text-anchor="middle" font-size="13" font-weight="600" fill="#f1ece1">SQLite (WAL)</text>
+          <text x="100" y="38" text-anchor="middle" font-size="10" font-family="JetBrains Mono" fill="#d4a943">clients · policies · audit</text>
+        </g>
+
+        <!-- pool de tuneis -->
+        <g transform="translate(70, 290)">
+          <rect width="1140" height="50" rx="6" fill="rgba(255,255,255,0.5)" stroke="rgba(20,40,59,0.25)" stroke-dasharray="4,3"/>
+          <text x="20" y="20" font-size="11" font-weight="600" font-family="JetBrains Mono" fill="#b88c2d" letter-spacing="1.5">POOL DE TÚNEIS · 1 container por cliente</text>
+          <text x="20" y="38" font-size="11" font-family="JetBrains Mono" fill="#14283b">vagg-tunnel-cliente-energia · cliente-distribuidora · cliente-industria · cliente-construtora · cliente-varejo …</text>
+        </g>
+      </g>
+
+      <!-- arrows down to clients -->
+      <line x1="180" y1="350" x2="180" y2="420" stroke="#8b8775" stroke-width="1.5" stroke-dasharray="4,3" marker-end="url(#arrow-dim)"/>
+      <line x1="430" y1="350" x2="430" y2="420" stroke="#8b8775" stroke-width="1.5" stroke-dasharray="4,3" marker-end="url(#arrow-dim)"/>
+      <line x1="680" y1="350" x2="680" y2="420" stroke="#8b8775" stroke-width="1.5" stroke-dasharray="4,3" marker-end="url(#arrow-dim)"/>
+      <line x1="930" y1="350" x2="930" y2="420" stroke="#8b8775" stroke-width="1.5" stroke-dasharray="4,3" marker-end="url(#arrow-dim)"/>
+      <line x1="1130" y1="350" x2="1130" y2="420" stroke="#8b8775" stroke-width="1.5" stroke-dasharray="4,3" marker-end="url(#arrow-dim)"/>
+
+      <!-- TIER 3: Clientes -->
+      <g>
+        <rect x="50" y="420" width="1180" height="100" rx="10" fill="rgba(20,40,59,0.04)" stroke="rgba(20,40,59,0.18)" stroke-dasharray="6,4"/>
+        <text x="70" y="448" font-size="13" font-weight="600" font-family="JetBrains Mono" fill="#b88c2d" letter-spacing="2">REDES DOS CLIENTES · GATEWAYS DE VPN</text>
+        <g transform="translate(100, 466)">
+          <rect width="160" height="44" rx="6" fill="#14283b"/>
+          <text x="80" y="20" text-anchor="middle" font-size="12" font-weight="600" fill="#f1ece1">Cliente Energia</text>
+          <text x="80" y="36" text-anchor="middle" font-size="10" font-family="JetBrains Mono" fill="#d4a943">FortiClient SSL</text>
+        </g>
+        <g transform="translate(350, 466)">
+          <rect width="160" height="44" rx="6" fill="#14283b"/>
+          <text x="80" y="20" text-anchor="middle" font-size="12" font-weight="600" fill="#f1ece1">Cliente Distrib.</text>
+          <text x="80" y="36" text-anchor="middle" font-size="10" font-family="JetBrains Mono" fill="#d4a943">FortiClient + OTP</text>
+        </g>
+        <g transform="translate(600, 466)">
+          <rect width="160" height="44" rx="6" fill="#14283b"/>
+          <text x="80" y="20" text-anchor="middle" font-size="12" font-weight="600" fill="#f1ece1">Cliente Indústria</text>
+          <text x="80" y="36" text-anchor="middle" font-size="10" font-family="JetBrains Mono" fill="#d4a943">FortiClient SSL</text>
+        </g>
+        <g transform="translate(850, 466)">
+          <rect width="160" height="44" rx="6" fill="#14283b"/>
+          <text x="80" y="20" text-anchor="middle" font-size="12" font-weight="600" fill="#f1ece1">Cliente Constr.</text>
+          <text x="80" y="36" text-anchor="middle" font-size="10" font-family="JetBrains Mono" fill="#d4a943">GlobalProtect SAML</text>
+        </g>
+        <g transform="translate(1050, 466)">
+          <rect width="160" height="44" rx="6" fill="#14283b"/>
+          <text x="80" y="20" text-anchor="middle" font-size="12" font-weight="600" fill="#f1ece1">Cliente Varejo</text>
+          <text x="80" y="36" text-anchor="middle" font-size="10" font-family="JetBrains Mono" fill="#d4a943">FortiClient SAML</text>
+        </g>
+      </g>
+    </svg>
+  </div>
+</section>
+
+<!-- 05 — COMO O PACOTE VIAJA -->
+<section class="slide">
+  <div class="branding">
+    <svg class="mark" viewBox="0 0 28 28"><circle cx="4" cy="4" r="2" fill="#c9c2b3"/><circle cx="24" cy="4" r="2" fill="#c9c2b3"/><circle cx="4" cy="24" r="2" fill="#c9c2b3"/><circle cx="24" cy="24" r="2" fill="#c9c2b3"/><path d="M4 4 L14 14" stroke="#8b8775" stroke-width="1.4" fill="none"/><path d="M24 4 L14 14" stroke="#8b8775" stroke-width="1.4" fill="none"/><path d="M4 24 L14 14" stroke="#8b8775" stroke-width="1.4" fill="none"/><path d="M24 24 L14 14" stroke="#8b8775" stroke-width="1.4" fill="none"/><rect x="10" y="10" width="8" height="8" rx="1.6" fill="#d4a943"/></svg>
+    <span class="wordmark">vagg<span class="dot">.</span></span>
+    <span class="by-roit">BY ROIT</span>
+  </div>
+  <div class="num">05 / 14</div>
+
+  <span class="tag">fluxo do pacote</span>
+  <h1>Como o tráfego do consultor chega no servidor do cliente.</h1>
+
+  <dl class="pair mt-8">
+    <div>
+      <dt>1 · Resolve DNS</dt>
+      <dd>Consultor faz <span class="mono ac">ssh sap.cliente-energia.vpn.roit</span>. DNS interno aponta para o VAGG.</dd>
+    </div>
+    <div>
+      <dt>2 · NAT virtual</dt>
+      <dd>VAGG retorna IP virtual <span class="mono ac">10.200.11.50</span>. Cada cliente tem um <span class="mono">/24</span> só dele no espaço virtual <span class="mono">10.200.0.0/16</span>.</dd>
+    </div>
+    <div>
+      <dt>3 · Avalia política RBAC</dt>
+      <dd>O VAGG verifica: consultor tem policy ativa para <span class="ac">Cliente Energia</span>? <span class="mono" style="color: var(--signal-ok);">Sim</span> → rota liberada. <span class="mono" style="color: var(--signal-err);">Não</span> → packet drop + audit event.</dd>
+    </div>
+    <div>
+      <dt>4 · Reescreve destino</dt>
+      <dd>iptables NETMAP traduz <span class="mono">10.200.11.50</span> → IP real do cliente <span class="mono">192.168.1.50</span>.</dd>
+    </div>
+    <div>
+      <dt>5 · Encaminha via túnel</dt>
+      <dd>Marca de pacote roteia o tráfego para a interface <span class="mono">ppp0</span> do container <span class="mono">vagg-tunnel-cliente-energia</span>.</dd>
+    </div>
+    <div>
+      <dt>6 · Resposta</dt>
+      <dd>Volta pelo caminho inverso com SNAT. Audit log registra a transação completa.</dd>
+    </div>
+  </dl>
+
+  <div class="banner beta mt-8">
+    <div style="color: var(--gold); font-size: 20px;">⚡</div>
+    <div>
+      <strong>Overhead esperado:</strong> &lt; 5ms vs conexão direta. Mas IPs sobrepostos entre clientes deixam de ser bug — viram only configuração.
+    </div>
+  </div>
+</section>
+
+<!-- 06 — POLÍTICAS (CRÍTICO) -->
+<section class="slide alt">
+  <div class="branding">
+    <svg class="mark" viewBox="0 0 28 28"><circle cx="4" cy="4" r="2" fill="#c9c2b3"/><circle cx="24" cy="4" r="2" fill="#c9c2b3"/><circle cx="4" cy="24" r="2" fill="#c9c2b3"/><circle cx="24" cy="24" r="2" fill="#c9c2b3"/><path d="M4 4 L14 14" stroke="#8b8775" stroke-width="1.4" fill="none"/><path d="M24 4 L14 14" stroke="#8b8775" stroke-width="1.4" fill="none"/><path d="M4 24 L14 14" stroke="#8b8775" stroke-width="1.4" fill="none"/><path d="M24 24 L14 14" stroke="#8b8775" stroke-width="1.4" fill="none"/><rect x="10" y="10" width="8" height="8" rx="1.6" fill="#d4a943"/></svg>
+    <span class="wordmark">vagg<span class="dot">.</span></span>
+    <span class="by-roit">BY ROIT</span>
+  </div>
+  <div class="num">06 / 14</div>
+
+  <span class="tag">controle de acesso · ponto-chave</span>
+  <h1>Sem política, sem acesso. <span class="ac">Default-deny.</span></h1>
+  <p class="lead">Esse é o mecanismo mais importante para a ROIT — e o que dá conforto regulatório aos clientes.</p>
+
+  <div class="grid-2 mt-12">
+    <div class="card feature">
+      <h3>Como funciona</h3>
+      <ul>
+        <li>Cada consultor é cadastrado uma única vez no painel VAGG</li>
+        <li>Admin atribui uma <strong>policy</strong> por par <span class="mono ac">consultor × cliente</span></li>
+        <li>Sem policy ativa, o pacote NÃO sai do agregador — pacote é dropado e gera audit event</li>
+        <li>Revogação é instantânea: remover policy = perda imediata de acesso (próximo pacote já é negado)</li>
+        <li>Toda decisão (allow/deny) é registrada em audit log hash-chained</li>
+      </ul>
+    </div>
+    <div class="card feature">
+      <h3>Por que isso importa</h3>
+      <ul>
+        <li><strong>Onboarding</strong> de novo consultor: 1 clique por cliente que precisa acessar</li>
+        <li><strong>Offboarding</strong>: revogação central, &lt; 5s — em vez de remover de N VPNs</li>
+        <li><strong>Auditoria do cliente final</strong>: "quem da ROIT acessou minha rede em Q3?" — relatório pronto</li>
+        <li><strong>Compliance LGPD</strong> (Art. 37) — registro de operações já cumpre por construção</li>
+        <li><strong>Defesa contratual</strong>: evidência técnica do RBAC nos contratos com clientes</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="mt-12">
+    <h4>Matriz lógica de acesso</h4>
+    <table class="compare">
+      <thead>
+        <tr>
+          <th>Consultor</th>
+          <th>Cli. Energia</th>
+          <th>Cli. Distribuidora</th>
+          <th>Cli. Indústria</th>
+          <th>Cli. Construtora</th>
+          <th>Cli. Varejo</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td>Consultor A · SAP Basis</td><td class="yes">✓ allow</td><td class="no">— deny</td><td class="yes">✓ allow</td><td class="no">— deny</td><td class="no">— deny</td></tr>
+        <tr><td>Consultor B · MM</td><td class="no">— deny</td><td class="yes">✓ allow</td><td class="no">— deny</td><td class="yes">✓ allow</td><td class="no">— deny</td></tr>
+        <tr><td>Consultor C · FI/CO</td><td class="yes">✓ allow</td><td class="yes">✓ allow</td><td class="no">— deny</td><td class="no">— deny</td><td class="yes">✓ allow</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- 07 — VPN ROIT OBRIGATÓRIA -->
+<section class="slide paper">
+  <div class="branding">
+    <svg class="mark" viewBox="0 0 28 28"><circle cx="4" cy="4" r="2" fill="#14283b"/><circle cx="24" cy="4" r="2" fill="#14283b"/><circle cx="4" cy="24" r="2" fill="#14283b"/><circle cx="24" cy="24" r="2" fill="#14283b"/><path d="M4 4 L14 14" stroke="#5a5749" stroke-width="1.4" fill="none"/><path d="M24 4 L14 14" stroke="#5a5749" stroke-width="1.4" fill="none"/><path d="M4 24 L14 14" stroke="#5a5749" stroke-width="1.4" fill="none"/><path d="M24 24 L14 14" stroke="#5a5749" stroke-width="1.4" fill="none"/><rect x="10" y="10" width="8" height="8" rx="1.6" fill="#b88c2d"/></svg>
+    <span class="wordmark" style="color: #14283b;">vagg<span class="dot" style="color: #b88c2d;">.</span></span>
+    <span class="by-roit" style="color: #5a5749; border-left-color: #b6bbc2;">BY ROIT</span>
+  </div>
+  <div class="num" style="color: #b88c2d;">07 / 14</div>
+
+  <span class="tag">consultores externos · regra obrigatória</span>
+  <h1>Fora da ROIT? <span class="ac">Conecte na VPN ROIT primeiro.</span></h1>
+  <p class="lead">O VAGG não está exposto na internet — por design. Só quem está na rede da ROIT (pessoalmente ou via VPN corporativa) consegue alcançar o servidor.</p>
+
+  <div class="grid-2 mt-12">
+    <div>
+      <h3>Cenário do consultor remoto</h3>
+      <ol style="padding-left: 24px;">
+        <li>Consultor em casa, em coworking, em viagem</li>
+        <li>Abre o cliente OpenVPN/Wireguard da ROIT — autentica com MFA</li>
+        <li>Recebe IP da VPN corporativa ROIT</li>
+        <li>Abre o VAGG Client → painel carrega normalmente</li>
+        <li>Clientes liberados aparecem; rotas para redes dos clientes são aplicadas</li>
+      </ol>
+      <div class="banner beta mt-8" style="background: rgba(212,169,67,0.08); border-color: var(--gold-2);">
+        <div style="color: var(--gold-2); font-size: 20px;">🔒</div>
+        <div>
+          <strong style="color: var(--gold-2);">Por que essa exigência:</strong>
+          <span style="color: #2c3e50;"> centraliza a autenticação corporativa em um único ponto (VPN ROIT com MFA), aproveita o controle já existente e evita expor o agregador para a internet pública.</span>
+        </div>
+      </div>
+    </div>
+    <div>
+      <h3>O que o consultor NÃO precisa fazer</h3>
+      <ul>
+        <li>Instalar FortiClient</li>
+        <li>Instalar GlobalProtect</li>
+        <li>Cadastrar AnyConnect</li>
+        <li>Configurar Wireguard do cliente</li>
+        <li>Guardar senhas dos clientes</li>
+        <li>Lembrar de portas custom, gateways, certificados</li>
+        <li>Fazer push de Authenticator a cada reconexão</li>
+      </ul>
+      <h3 class="mt-8">O que o consultor faz</h3>
+      <ul>
+        <li>1ª vez: instala o VAGG Client (instalador <span class="mono">.exe</span>) e loga com credencial ROIT</li>
+        <li>Dia-a-dia: VPN ROIT + abre o VAGG Client; clientes liberados aparecem</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- 08 — PAINEL ADMIN (screenshots) -->
+<section class="slide">
+  <div class="branding">
+    <svg class="mark" viewBox="0 0 28 28"><circle cx="4" cy="4" r="2" fill="#c9c2b3"/><circle cx="24" cy="4" r="2" fill="#c9c2b3"/><circle cx="4" cy="24" r="2" fill="#c9c2b3"/><circle cx="24" cy="24" r="2" fill="#c9c2b3"/><path d="M4 4 L14 14" stroke="#8b8775" stroke-width="1.4" fill="none"/><path d="M24 4 L14 14" stroke="#8b8775" stroke-width="1.4" fill="none"/><path d="M4 24 L14 14" stroke="#8b8775" stroke-width="1.4" fill="none"/><path d="M24 24 L14 14" stroke="#8b8775" stroke-width="1.4" fill="none"/><rect x="10" y="10" width="8" height="8" rx="1.6" fill="#d4a943"/></svg>
+    <span class="wordmark">vagg<span class="dot">.</span></span>
+    <span class="by-roit">BY ROIT</span>
+  </div>
+  <div class="num">08 / 14</div>
+
+  <span class="tag">painel administrativo</span>
+  <h1>O console do time de TI da ROIT.</h1>
+  <p class="lead">Tudo gira em torno do painel: cadastro de clientes, consultores, políticas, monitoramento, auditoria.</p>
+
+  <div class="mt-8">
+    <img class="shot" src="screenshots/painel-clientes.png" alt="Painel · Lista de clientes (nomes anonimizados)"/>
+    <div class="shot-cap">PAINEL · LISTA DE CLIENTES · NOMES ANONIMIZADOS PARA APRESENTAÇÃO</div>
+  </div>
+</section>
+
+<!-- 09 — POLÍTICAS / CONSULTORES (screenshots) -->
+<section class="slide">
+  <div class="branding">
+    <svg class="mark" viewBox="0 0 28 28"><circle cx="4" cy="4" r="2" fill="#c9c2b3"/><circle cx="24" cy="4" r="2" fill="#c9c2b3"/><circle cx="4" cy="24" r="2" fill="#c9c2b3"/><circle cx="24" cy="24" r="2" fill="#c9c2b3"/><path d="M4 4 L14 14" stroke="#8b8775" stroke-width="1.4" fill="none"/><path d="M24 4 L14 14" stroke="#8b8775" stroke-width="1.4" fill="none"/><path d="M4 24 L14 14" stroke="#8b8775" stroke-width="1.4" fill="none"/><path d="M24 24 L14 14" stroke="#8b8775" stroke-width="1.4" fill="none"/><rect x="10" y="10" width="8" height="8" rx="1.6" fill="#d4a943"/></svg>
+    <span class="wordmark">vagg<span class="dot">.</span></span>
+    <span class="by-roit">BY ROIT</span>
+  </div>
+  <div class="num">09 / 14</div>
+
+  <span class="tag">consultores · políticas</span>
+  <h1>Quem acessa o quê — explícito e auditável.</h1>
+
+  <div class="grid-2 mt-8">
+    <div>
+      <img class="shot" src="screenshots/consultores.png" alt="Painel · Consultores"/>
+      <div class="shot-cap">CONSULTORES · CADASTRO E POLICIES</div>
+    </div>
+    <div>
+      <img class="shot" src="screenshots/politicas.png" alt="Painel · Policies"/>
+      <div class="shot-cap">POLICIES · MATRIZ CONSULTOR × CLIENTE</div>
+    </div>
+  </div>
+</section>
+
+<!-- 10 — AUDITORIA + SISTEMA -->
+<section class="slide alt">
+  <div class="branding">
+    <svg class="mark" viewBox="0 0 28 28"><circle cx="4" cy="4" r="2" fill="#c9c2b3"/><circle cx="24" cy="4" r="2" fill="#c9c2b3"/><circle cx="4" cy="24" r="2" fill="#c9c2b3"/><circle cx="24" cy="24" r="2" fill="#c9c2b3"/><path d="M4 4 L14 14" stroke="#8b8775" stroke-width="1.4" fill="none"/><path d="M24 4 L14 14" stroke="#8b8775" stroke-width="1.4" fill="none"/><path d="M4 24 L14 14" stroke="#8b8775" stroke-width="1.4" fill="none"/><path d="M24 24 L14 14" stroke="#8b8775" stroke-width="1.4" fill="none"/><rect x="10" y="10" width="8" height="8" rx="1.6" fill="#d4a943"/></svg>
+    <span class="wordmark">vagg<span class="dot">.</span></span>
+    <span class="by-roit">BY ROIT</span>
+  </div>
+  <div class="num">10 / 14</div>
+
+  <span class="tag">auditoria · sistema</span>
+  <h1>Tudo registrado. <span class="ac">Hash-chained.</span></h1>
+  <p class="lead">Audit log com encadeamento criptográfico — pronto para Art. 37 da LGPD e para o portal de transparência do cliente final.</p>
+
+  <div class="grid-2 mt-8">
+    <div>
+      <img class="shot" src="screenshots/audit.png" alt="Painel · Auditoria"/>
+      <div class="shot-cap">AUDITORIA · EVENTOS COM FILTRO E EXPORT</div>
+    </div>
+    <div>
+      <img class="shot" src="screenshots/system.png" alt="Painel · Sistema"/>
+      <div class="shot-cap">SISTEMA · STATUS · BACKUP · VERSÃO</div>
+    </div>
+  </div>
+</section>
+
+<!-- 11 — CLIENT WINDOWS (mockup) -->
+<section class="slide">
+  <div class="branding">
+    <svg class="mark" viewBox="0 0 28 28"><circle cx="4" cy="4" r="2" fill="#c9c2b3"/><circle cx="24" cy="4" r="2" fill="#c9c2b3"/><circle cx="4" cy="24" r="2" fill="#c9c2b3"/><circle cx="24" cy="24" r="2" fill="#c9c2b3"/><path d="M4 4 L14 14" stroke="#8b8775" stroke-width="1.4" fill="none"/><path d="M24 4 L14 14" stroke="#8b8775" stroke-width="1.4" fill="none"/><path d="M4 24 L14 14" stroke="#8b8775" stroke-width="1.4" fill="none"/><path d="M24 24 L14 14" stroke="#8b8775" stroke-width="1.4" fill="none"/><rect x="10" y="10" width="8" height="8" rx="1.6" fill="#d4a943"/></svg>
+    <span class="wordmark">vagg<span class="dot">.</span></span>
+    <span class="by-roit">BY ROIT</span>
+  </div>
+  <div class="num">11 / 14</div>
+
+  <span class="tag">VAGG client · windows</span>
+  <h1>O lado do consultor — uma janela, três botões.</h1>
+
+  <div class="grid-2 mt-8">
+    <div>
+      <h3>O que o consultor vê</h3>
+      <p>Pequena aplicação nativa Windows (.exe instalável). Roda na bandeja do sistema. Mostra apenas
+        os clientes liberados para aquele consultor — definidos pelas policies no servidor.</p>
+
+      <h3 class="mt-8">O que faz por baixo</h3>
+      <ul>
+        <li>Login com credencial ROIT (uma vez)</li>
+        <li>Sincroniza policies a cada <span class="mono ac">~30s</span></li>
+        <li>Aplica rotas no Windows automaticamente (Windows Service)</li>
+        <li>Bandeja com LED de status (verde / vermelho)</li>
+        <li>Botão "Atualizar rotas" para forçar resync manual</li>
+      </ul>
+
+      <h3 class="mt-8">Zero VPN client específico</h3>
+      <p>O consultor não instala FortiClient nem GlobalProtect — esses ficam apenas no servidor VAGG.
+        No notebook só existe o VAGG Client.</p>
+    </div>
+
+    <div style="display: flex; justify-content: center; align-items: flex-start;">
+      <div class="winapp">
+        <div class="titlebar">
+          <div class="dots"><span class="dot"></span><span class="dot"></span><span class="dot"></span></div>
+          <span>vagg-client · 0.5.0</span>
+        </div>
+        <div class="body">
+          <div class="head">
+            <div class="id">
+              <div class="name">vagg<span class="dot">.</span> <span style="font-size: 11px; color: #7a808a; font-weight: 400;">client</span></div>
+              <div class="sub">consultor.demo · admin</div>
+            </div>
+            <div class="actions">
+              <button class="btn-icon">⎯</button>
+              <button class="btn-icon">↪</button>
+            </div>
+          </div>
+
+          <div class="status-block">
+            <div>
+              <span class="led"></span>
+              <span style="font-size: 13px; font-weight: 500;">Conectado ao servidor</span>
+              <div class="mono" style="font-size: 10px; color: #7a808a; margin-top: 4px;">https://vagg.roit.local</div>
+            </div>
+            <div class="stats">
+              <div class="stat"><div class="k">Rotas</div><div class="v">12</div></div>
+              <div class="stat"><div class="k">Clientes</div><div class="v">3</div></div>
+              <div class="stat"><div class="k">Última sync</div><div class="v mono" style="font-size: 12px;">15:42</div></div>
+            </div>
+            <div class="actions-row">
+              <button class="btn-prim">↻ Sincronizar agora</button>
+              <button class="btn-sec">Atualizar rotas</button>
+            </div>
+          </div>
+
+          <div class="clients-block">
+            <div class="title">Clientes liberados</div>
+            <div class="row"><span class="led-tiny"></span><span class="nm">Cliente Energia</span><span class="cidr">10.200.11.0/24</span></div>
+            <div class="row"><span class="led-tiny"></span><span class="nm">Cliente Indústria</span><span class="cidr">10.200.13.0/24</span></div>
+            <div class="row"><span class="led-tiny led-off"></span><span class="nm">Cliente Varejo</span><span class="cidr">aguardando…</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 12 — BENEFÍCIOS (resumo executivo) -->
+<section class="slide paper">
+  <div class="branding">
+    <svg class="mark" viewBox="0 0 28 28"><circle cx="4" cy="4" r="2" fill="#14283b"/><circle cx="24" cy="4" r="2" fill="#14283b"/><circle cx="4" cy="24" r="2" fill="#14283b"/><circle cx="24" cy="24" r="2" fill="#14283b"/><path d="M4 4 L14 14" stroke="#5a5749" stroke-width="1.4" fill="none"/><path d="M24 4 L14 14" stroke="#5a5749" stroke-width="1.4" fill="none"/><path d="M4 24 L14 14" stroke="#5a5749" stroke-width="1.4" fill="none"/><path d="M24 24 L14 14" stroke="#5a5749" stroke-width="1.4" fill="none"/><rect x="10" y="10" width="8" height="8" rx="1.6" fill="#b88c2d"/></svg>
+    <span class="wordmark" style="color: #14283b;">vagg<span class="dot" style="color: #b88c2d;">.</span></span>
+    <span class="by-roit" style="color: #5a5749; border-left-color: #b6bbc2;">BY ROIT</span>
+  </div>
+  <div class="num" style="color: #b88c2d;">12 / 14</div>
+
+  <span class="tag">ganhos para a roit</span>
+  <h1>O que o time vai sentir.</h1>
+
+  <table class="compare">
+    <thead>
+      <tr><th>Frente</th><th>Antes</th><th>Com VAGG</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Notebook do consultor</td>
+        <td class="no">N clientes VPN instalados, atualizados manualmente</td>
+        <td class="yes">Apenas VAGG Client + VPN ROIT</td>
+      </tr>
+      <tr>
+        <td>Onboarding</td>
+        <td class="no">Acesso liberado em N sistemas; 1-2 dias úteis</td>
+        <td class="yes">Policies por cliente; minutos</td>
+      </tr>
+      <tr>
+        <td>Offboarding</td>
+        <td class="no">Revogar em N VPNs; risco de esquecer alguma</td>
+        <td class="yes">Revogação central, instantânea</td>
+      </tr>
+      <tr>
+        <td>Credenciais dos clientes</td>
+        <td class="no">Em planilhas / drives / chats</td>
+        <td class="yes">Cofre único no servidor; consultor nunca vê</td>
+      </tr>
+      <tr>
+        <td>MFA dos clientes</td>
+        <td class="no">Push do Authenticator a cada reconexão</td>
+        <td class="yes">MFA da VPN ROIT apenas (1x por sessão)</td>
+      </tr>
+      <tr>
+        <td>IPs sobrepostos</td>
+        <td class="no">Bug de roteamento inevitável</td>
+        <td class="yes">NAT remapping centralizado</td>
+      </tr>
+      <tr>
+        <td>Auditoria</td>
+        <td class="no">Sem trilha unificada</td>
+        <td class="yes">Audit log hash-chained, export PDF/CSV</td>
+      </tr>
+      <tr>
+        <td>Pergunta do cliente final</td>
+        <td class="no">Resposta manual sob demanda</td>
+        <td class="yes">Portal de transparência read-only (roadmap)</td>
+      </tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- 13 — STATUS ATUAL / ESTABILIZAÇÃO (CRÍTICO) -->
+<section class="slide alt">
+  <div class="branding">
+    <svg class="mark" viewBox="0 0 28 28"><circle cx="4" cy="4" r="2" fill="#c9c2b3"/><circle cx="24" cy="4" r="2" fill="#c9c2b3"/><circle cx="4" cy="24" r="2" fill="#c9c2b3"/><circle cx="24" cy="24" r="2" fill="#c9c2b3"/><path d="M4 4 L14 14" stroke="#8b8775" stroke-width="1.4" fill="none"/><path d="M24 4 L14 14" stroke="#8b8775" stroke-width="1.4" fill="none"/><path d="M4 24 L14 14" stroke="#8b8775" stroke-width="1.4" fill="none"/><path d="M24 24 L14 14" stroke="#8b8775" stroke-width="1.4" fill="none"/><rect x="10" y="10" width="8" height="8" rx="1.6" fill="#d4a943"/></svg>
+    <span class="wordmark">vagg<span class="dot">.</span></span>
+    <span class="by-roit">BY ROIT</span>
+  </div>
+  <div class="num">13 / 14</div>
+
+  <span class="tag">situação atual</span>
+  <h1>Onde estamos: <span class="ac">fase de estabilização.</span></h1>
+
+  <div class="banner beta">
+    <div style="color: var(--gold); font-size: 32px;">⚠</div>
+    <div>
+      <strong>Pré-MVP em estabilização.</strong> O sistema já está conectando clientes reais em produção interna,
+      mas ainda estamos endurecendo os caminhos de erro, instrumentação e UX. Quebras ocasionais são esperadas
+      e tratadas no mesmo dia.
+    </div>
+  </div>
+
+  <div class="grid-3 mt-12">
+    <div class="card">
+      <h4>Funcionando hoje</h4>
+      <ul style="font-size: 14px;">
+        <li>FortiGate SSL VPN (5 clientes em produção interna)</li>
+        <li>SAML SSO com Azure AD via popup automático</li>
+        <li>MFA TOTP automatizado via seed cadastrado</li>
+        <li>Cliente Windows com tray + service de rotas</li>
+        <li>Audit log hash-chained</li>
+        <li>Watchdog de rotas (anti-hijack)</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h4>Em estabilização</h4>
+      <ul style="font-size: 14px;">
+        <li>GlobalProtect com HIP report (cliente construtora)</li>
+        <li>UX da extensão Chrome (SAML capture)</li>
+        <li>Tratamento de tunnel cair/voltar</li>
+        <li>Métricas e dashboards operacionais</li>
+        <li>Portal de transparência para cliente final</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h4>Roadmap pós-MVP</h4>
+      <ul style="font-size: 14px;">
+        <li>WireGuard, IPsec, OpenVPN UDP</li>
+        <li>JIT access via Slack</li>
+        <li>Time-bounded policies</li>
+        <li>Anomaly detection (acesso fora do padrão)</li>
+        <li>Cliente macOS / Linux</li>
+      </ul>
+    </div>
+  </div>
+
+  <h3 class="mt-12">Como pedir suporte / reportar</h3>
+  <p style="max-width: 1000px;">Durante a estabilização, qualquer comportamento estranho — conexão pendurada, cliente sumindo da lista,
+    erro inesperado no painel — favor reportar no canal interno com captura de tela e horário aproximado. Esses sinais aceleram
+    a estabilização e ajudam a priorizar o que endurecer primeiro.</p>
+</section>
+
+<!-- 14 — CLOSING -->
+<section class="slide cover">
+  <div class="branding">
+    <svg class="mark" viewBox="0 0 28 28"><circle cx="4" cy="4" r="2" fill="#c9c2b3"/><circle cx="24" cy="4" r="2" fill="#c9c2b3"/><circle cx="4" cy="24" r="2" fill="#c9c2b3"/><circle cx="24" cy="24" r="2" fill="#c9c2b3"/><path d="M4 4 L14 14" stroke="#8b8775" stroke-width="1.4" fill="none"/><path d="M24 4 L14 14" stroke="#8b8775" stroke-width="1.4" fill="none"/><path d="M4 24 L14 14" stroke="#8b8775" stroke-width="1.4" fill="none"/><path d="M24 24 L14 14" stroke="#8b8775" stroke-width="1.4" fill="none"/><rect x="10" y="10" width="8" height="8" rx="1.6" fill="#d4a943"/></svg>
+    <span class="wordmark">vagg<span class="dot">.</span></span>
+    <span class="by-roit">BY ROIT</span>
+  </div>
+  <div class="num">14 / 14</div>
+
+  <div style="margin-top: auto;">
+    <span class="tag">próximos passos</span>
+    <h1 class="huge">Uma conexão.<br/><span class="ac">Todos os clientes.</span></h1>
+    <p class="lead mt-4" style="max-width: 1100px;">
+      O VAGG já está reduzindo atrito real para o time de consultoria que está usando.
+      Conforme estabilizamos, a expansão para todos da ROIT é orgânica — basta criar a policy e o consultor passa a ver o cliente.
+    </p>
+  </div>
+
+  <footer style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 64px; margin-top: 80px;">
+    <div>
+      <div class="mono" style="font-size: 11px; color: var(--ink-3); letter-spacing: 0.18em; text-transform: uppercase;">Repositório</div>
+      <div class="mono" style="font-size: 14px; color: var(--gold); margin-top: 8px;">github.com/rduarte6982/vagg</div>
+    </div>
+    <div>
+      <div class="mono" style="font-size: 11px; color: var(--ink-3); letter-spacing: 0.18em; text-transform: uppercase;">Servidor de teste</div>
+      <div class="mono" style="font-size: 14px; color: var(--gold); margin-top: 8px;">vagg.roit.local · 192.168.68.102</div>
+    </div>
+    <div>
+      <div class="mono" style="font-size: 11px; color: var(--ink-3); letter-spacing: 0.18em; text-transform: uppercase;">Owner técnico</div>
+      <div class="mono" style="font-size: 14px; color: var(--ink); margin-top: 8px;">Rodrigo Duarte · ROIT</div>
+    </div>
+  </footer>
+</section>
+
+</div>
+</body>
+</html>

@@ -29,7 +29,16 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Clients, Saml, Tunnels, type Client, type TunnelState, type VpnType } from '@/lib/api';
+import {
+  Clients,
+  Saml,
+  Totp,
+  Tunnels,
+  type Client,
+  type TotpInfo,
+  type TunnelState,
+  type VpnType,
+} from '@/lib/api';
 import { usePoll } from '@/lib/polling';
 
 const VPN_TYPES: VpnType[] = [
@@ -200,6 +209,13 @@ export function ClientsPage() {
   const [search, setSearch] = useState('');
   const [busyId, setBusyId] = useState<string | null>(null);
   const [editing, setEditing] = useState<Client | null>(null);
+  // TOTP / Auto-OTP — gerenciado via endpoints próprios (PUT/DELETE/preview),
+  // independente do PATCH do client. Carregado no openEdit, refletido após
+  // cada save/remove.
+  const [totpInfo, setTotpInfo] = useState<TotpInfo | null>(null);
+  const [totpInput, setTotpInput] = useState('');
+  const [totpBusy, setTotpBusy] = useState(false);
+  const [totpPreview, setTotpPreview] = useState<{ code: string; seconds: number } | null>(null);
   // Form de edição inclui campos write-only (config_text, user, password) que
   // o GET /clients não retorna. Vazio = não toca no valor atual.
   const [editForm, setEditForm] = useState<{
@@ -283,6 +299,72 @@ export function ClientsPage() {
     await list.refetch();
   };
 
+  // ─── TOTP / Auto-OTP handlers ─────────────────────────────────────────
+  const saveTotpSeed = async () => {
+    if (!editing) return;
+    const seed = totpInput.trim();
+    if (seed.length < 4) {
+      toast.error('Seed muito curto', 'Cole o base32 inteiro ou a URI otpauth://');
+      return;
+    }
+    setTotpBusy(true);
+    try {
+      const info = await Totp.set(editing.id, seed);
+      setTotpInfo(info);
+      setTotpInput('');
+      toast.success(
+        'Auto-OTP ativado',
+        'VAGG vai gerar o código TOTP automaticamente a cada conexão.',
+      );
+      await list.refetch();
+    } catch (err) {
+      toast.error(
+        'Falha ao cadastrar seed',
+        err instanceof Error ? err.message : String(err),
+      );
+    } finally {
+      setTotpBusy(false);
+    }
+  };
+
+  const removeTotpSeed = async () => {
+    if (!editing) return;
+    if (!confirm('Remover seed TOTP? O Conectar vai voltar a pedir o código manualmente.')) {
+      return;
+    }
+    setTotpBusy(true);
+    try {
+      await Totp.remove(editing.id);
+      setTotpInfo({ has_secret: false });
+      setTotpPreview(null);
+      toast.success('Seed removido', 'Cliente voltou pro modo OTP manual.');
+      await list.refetch();
+    } catch (err) {
+      toast.error(
+        'Falha ao remover seed',
+        err instanceof Error ? err.message : String(err),
+      );
+    } finally {
+      setTotpBusy(false);
+    }
+  };
+
+  const previewTotpCode = async () => {
+    if (!editing) return;
+    setTotpBusy(true);
+    try {
+      const prev = await Totp.preview(editing.id);
+      setTotpPreview({ code: prev.code, seconds: prev.seconds_remaining });
+    } catch (err) {
+      toast.error(
+        'Falha no preview',
+        err instanceof Error ? err.message : String(err),
+      );
+    } finally {
+      setTotpBusy(false);
+    }
+  };
+
   // Estado pro fluxo de OTP/MFA: quando o cliente tem requires_otp,
   // o botão "Conectar" abre um modal pedindo o código antes de iniciar.
   const [otpModalFor, setOtpModalFor] = useState<Client | null>(null);
@@ -294,12 +376,34 @@ export function ClientsPage() {
     if (!c) return;
     const method = c.auth_method ?? (c.requires_otp ? 'otp' : 'none');
     if (method === 'otp') {
+      // Auto-OTP: seed TOTP cadastrado → backend gera código a cada connect
+      // automaticamente. Sem precisar pedir 6 dígitos pro admin.
+      if (c.has_totp_secret) {
+        toast.info(
+          'Conectando com Auto-OTP',
+          'VAGG vai gerar o código TOTP automaticamente — sem ação necessária.',
+        );
+        await connectInternal(id);
+        return;
+      }
       setOtpModalFor(c);
       setOtpCode('');
       return;
     }
     if (method === 'saml') {
-      // Se já tem cookie válido, conecta direto
+      // FortiGate + SAML: caminho NOVO via openfortivpn --saml-login=PORT
+      // (extensão Chrome captura URL 127.0.0.1:PORT/?id=X).
+      // GlobalProtect + SAML: caminho NOVO via popup tradicional + extensão
+      // Chrome captura cookies cross-domain via chrome.cookies API.
+      //
+      // Ambos usam a mesma UX (popup, extensão automatica). Diferença é:
+      //   - Forti: extensão pega ?id= do redirect e posta /saml-login/relay
+      //   - GP: extensão pega cookies do gateway domain e posta /saml-login/relay-cookie
+      if (c.vpn_type === 'openfortivpn' || c.vpn_type === 'globalprotect') {
+        await startSamlLoginPopup(c);
+        return;
+      }
+      // Outros (futuro): fallback pro fluxo legado.
       const exp = c.saml_cookie_expires_at
         ? new Date(c.saml_cookie_expires_at).getTime()
         : 0;
@@ -307,7 +411,6 @@ export function ClientsPage() {
         await connectInternal(id);
         return;
       }
-      // Cookie ausente/expirado → abre o portal SAML (browser remoto em iframe)
       await startSamlPortal(c);
       return;
     }
@@ -398,6 +501,230 @@ export function ClientsPage() {
       toast.error('Falha ao abrir portal SAML', msg);
     } finally {
       setSamlConnectBusy(false);
+    }
+  };
+
+  // ── SAML-LOGIN MODE (FortiGate Vexia) ────────────────────────────────
+  // Fluxo: backend sobe tunnel-<id> com openfortivpn --saml-login=PORT.
+  // Frontend abre popup pra Microsoft Sign-In. Quando o gateway redireciona
+  // pra http://127.0.0.1:PORT/?id=X (que falha no PC do user com
+  // ERR_CONNECTION_REFUSED por ser loopback do server), o user copia a URL
+  // do address bar do popup e cola no campo do painel. Frontend extrai o
+  // `id` e posta pro backend relayar pro openfortivpn local.
+  //
+  // Por que copy/paste e não polling: chromium-error pages bloqueiam
+  // window.location.href cross-origin, impossível auto-capturar nesse caso.
+  const [samlLoginFor, setSamlLoginFor] = useState<Client | null>(null);
+  const [samlLoginBusy, setSamlLoginBusy] = useState(false);
+  const [samlLoginStartUrl, setSamlLoginStartUrl] = useState<string | null>(null);
+  // portal_url ainda é retornado pelo backend mas não usamos no painel —
+  // o iframe noVNC virou opção avançada do user (não default).
+  const [, setSamlLoginPortalUrl] = useState<string | null>(null);
+  const [samlLoginPhase, setSamlLoginPhase] = useState<
+    'starting' | 'awaiting-user' | 'connecting' | 'connected' | 'error'
+  >('starting');
+  const [samlLoginPasteUrl, setSamlLoginPasteUrl] = useState('');
+  // Detecta se a extensão Chrome "VAGG SAML Relay" está instalada.
+  // Se sim, fluxo é 100% automático (extensão intercepta 127.0.0.1:8020 e
+  // faz relay). Se não, fallback pra clipboard / paste manual.
+  const [vaggExtInstalled, setVaggExtInstalled] = useState(false);
+  useEffect(() => {
+    const handler = (event: MessageEvent) => {
+      if (event.source !== window) return;
+      const data = event.data as { source?: string; type?: string };
+      if (data?.source === 'vagg-ext' && (data.type === 'installed' || data.type === 'pong')) {
+        setVaggExtInstalled(true);
+      }
+    };
+    window.addEventListener('message', handler);
+    // ping (caso extensão tenha demorado pra injetar)
+    setTimeout(() => {
+      window.postMessage({ source: 'vagg-page', type: 'ping' }, '*');
+    }, 200);
+    return () => window.removeEventListener('message', handler);
+  }, []);
+
+  const startSamlLoginPopup = async (c: Client) => {
+    setSamlLoginBusy(true);
+    setSamlLoginFor(c);
+    setSamlLoginStartUrl(null);
+    setSamlLoginPortalUrl(null);
+    setSamlLoginPhase('starting');
+    setSamlLoginPasteUrl('');
+    let session: Awaited<ReturnType<typeof Saml.startLogin>>;
+    try {
+      session = await Saml.startLogin(c.id);
+      setSamlLoginStartUrl(session.start_url);
+      setSamlLoginPortalUrl(session.portal_url ?? null);
+      setSamlLoginPhase('awaiting-user');
+    } catch (err) {
+      toast.error(
+        'Falha ao iniciar tunnel SAML-login',
+        err instanceof Error ? err.message : String(err),
+      );
+      setSamlLoginFor(null);
+      setSamlLoginPhase('error');
+      setSamlLoginBusy(false);
+      return;
+    }
+    setSamlLoginBusy(false);
+
+    // Se a extensão VAGG SAML Relay está instalada, registra "pending"
+    // no service worker dela: clientId + port + access_token. A extensão
+    // intercepta o redirect 127.0.0.1:<port> e faz o relay sozinha.
+    // UX 100% automática, N clients SAML simultâneos.
+    if (vaggExtInstalled) {
+      const tok = localStorage.getItem('vagg.access_token') || '';
+      const vaggBaseUrl = `${location.protocol}//${location.host}`;
+      window.postMessage(
+        {
+          source: 'vagg-page',
+          type: 'register-pending',
+          clientId: c.id,
+          port: session.port,
+          vpnType: session.vpn_type,
+          gatewayHost: session.gateway_host,
+          vaggBaseUrl,
+          accessToken: tok,
+        },
+        '*',
+      );
+      window.postMessage(
+        {
+          source: 'vagg-page',
+          type: 'set-config',
+          vaggBaseUrl,
+          accessToken: tok,
+        },
+        '*',
+      );
+    }
+
+    // Caminho principal: popup tradicional (Chrome do user). Password
+    // manager + autocomplete funcionam. Se a extensão está instalada,
+    // o tunnel sobe sozinho. Senão, fallback clipboard/paste.
+    window.open(
+      session.start_url,
+      'vagg-saml-login',
+      'width=600,height=750,resizable=yes,scrollbars=yes',
+    );
+    toast.info(
+      'Login Microsoft',
+      vaggExtInstalled
+        ? 'Complete o login na janela. Extensão VAGG vai entregar o resultado automaticamente.'
+        : 'Complete o login na janela, depois cole a URL aqui.',
+    );
+
+    // Polling roda em paralelo — se o iframe (fallback) entregar o id, ou
+    // o user submeter via paste, o tunnel sobe e fechamos o modal.
+    const clientId = c.id;
+    const startedAt = Date.now();
+    const timeoutMs = 5 * 60 * 1000;
+    const poll = async () => {
+      while (Date.now() - startedAt < timeoutMs) {
+        await new Promise((r) => setTimeout(r, 3000));
+        try {
+          const s = await Tunnels.status(clientId);
+          if (
+            s.state === 'up' ||
+            (s as unknown as { controller_state?: string }).controller_state ===
+              'connected'
+          ) {
+            setSamlLoginPhase('connected');
+            toast.success('Vexia conectada', `Túnel "${clientId}" UP.`);
+            await list.refetch();
+            setTimeout(() => {
+              setSamlLoginFor(null);
+              setSamlLoginPortalUrl(null);
+              setSamlLoginStartUrl(null);
+              setSamlLoginPhase('starting');
+            }, 1500);
+            return;
+          }
+        } catch {
+          /* transient */
+        }
+      }
+    };
+    void poll();
+  };
+
+  const submitSamlLoginUrl = async () => {
+    if (!samlLoginFor) return;
+    const clientId = samlLoginFor.id;
+    const url = samlLoginPasteUrl.trim();
+    const m = url.match(/[?&]id=([^&#\s]+)/);
+    if (!m) {
+      toast.error(
+        'URL inválida',
+        'A URL precisa ter "?id=..." (vem do popup que mostrou ERR_CONNECTION_REFUSED).',
+      );
+      return;
+    }
+    const samlId = decodeURIComponent(m[1]);
+    setSamlLoginBusy(true);
+    try {
+      await Saml.relayLogin(clientId, samlId);
+      setSamlLoginPhase('connecting');
+      toast.success(
+        'Túnel subindo',
+        `Cliente "${clientId}" conectando — aguarde alguns segundos.`,
+      );
+      setSamlLoginPasteUrl('');
+      await list.refetch();
+    } catch (err) {
+      toast.error(
+        'Falha no relay SAML',
+        err instanceof Error ? err.message : String(err),
+      );
+    } finally {
+      setSamlLoginBusy(false);
+    }
+  };
+
+  // Lê clipboard automaticamente e submete — UX 1-clique do popup tradicional.
+  // User copia URL no popup (Ctrl+L → Ctrl+C), volta ao painel, clica este
+  // botão. VAGG lê clipboard, extrai id, faz relay → tunnel sobe.
+  const submitSamlLoginFromClipboard = async () => {
+    if (!samlLoginFor) return;
+    let clipText = '';
+    try {
+      clipText = await navigator.clipboard.readText();
+    } catch (err) {
+      toast.error(
+        'Permissão de clipboard negada',
+        'Permita leitura do clipboard no navegador ou cole manualmente.',
+      );
+      return;
+    }
+    const m = clipText.match(/[?&]id=([^&#\s]+)/);
+    if (!m) {
+      toast.error(
+        'URL não detectada no clipboard',
+        'Copie a URL completa do popup (Ctrl+L, Ctrl+C) e tente novamente.',
+      );
+      return;
+    }
+    setSamlLoginPasteUrl(clipText);
+    const clientId = samlLoginFor.id;
+    const samlId = decodeURIComponent(m[1]);
+    setSamlLoginBusy(true);
+    try {
+      await Saml.relayLogin(clientId, samlId);
+      setSamlLoginPhase('connecting');
+      toast.success(
+        'Túnel subindo',
+        `Cliente "${clientId}" conectando — aguarde alguns segundos.`,
+      );
+      setSamlLoginPasteUrl('');
+      await list.refetch();
+    } catch (err) {
+      toast.error(
+        'Falha no relay SAML',
+        err instanceof Error ? err.message : String(err),
+      );
+    } finally {
+      setSamlLoginBusy(false);
     }
   };
 
@@ -644,6 +971,18 @@ export function ClientsPage() {
   const openEdit = async (c: Client) => {
     setEditing(c);
     setEditLoading(true);
+    setTotpInfo(null);
+    setTotpInput('');
+    setTotpPreview(null);
+    // Carrega info do TOTP em paralelo — sem block do form
+    if ((c.auth_method ?? 'none') === 'otp') {
+      Totp.get(c.id)
+        .then(setTotpInfo)
+        .catch(() => {
+          // 404/erro = sem secret cadastrado; UI mostra o estado vazio
+          setTotpInfo({ has_secret: false });
+        });
+    }
     const initialExtras = (c.nat_mappings ?? []).map((m) => m.real_cidr);
     setEditForm({
       name: c.name,
@@ -888,9 +1227,32 @@ export function ClientsPage() {
                       </div>
                     </TableCell>
                     <TableCell>
-                      <span className="rounded-sm bg-secondary px-1.5 py-0.5 font-mono text-[11px] text-primary">
-                        {c.vpn_type}
-                      </span>
+                      <div className="flex flex-wrap items-center gap-1">
+                        <span className="rounded-sm bg-secondary px-1.5 py-0.5 font-mono text-[11px] text-primary">
+                          {c.vpn_type}
+                        </span>
+                        {c.auth_method === 'otp' && c.has_totp_secret && (
+                          <Tooltip label="Auto-OTP: VAGG gera o código TOTP automaticamente a cada connect">
+                            <span className="rounded-sm border border-[oklch(72%_0.16_160_/_0.35)] bg-[oklch(72%_0.16_160_/_0.08)] px-1.5 py-0.5 text-[10px] font-medium text-[oklch(72%_0.16_160)]">
+                              🔐 Auto-OTP
+                            </span>
+                          </Tooltip>
+                        )}
+                        {c.auth_method === 'otp' && !c.has_totp_secret && (
+                          <Tooltip label="OTP manual: pede 6 dígitos no Conectar. Cadastre o seed TOTP em Editar pra ficar zero-touch.">
+                            <span className="rounded-sm border border-[oklch(78%_0.14_75_/_0.35)] bg-[oklch(78%_0.14_75_/_0.06)] px-1.5 py-0.5 text-[10px] font-medium text-[oklch(78%_0.14_75)]">
+                              OTP manual
+                            </span>
+                          </Tooltip>
+                        )}
+                        {c.auth_method === 'saml' && (
+                          <Tooltip label="SAML/SSO via browser remoto">
+                            <span className="rounded-sm border border-[oklch(70%_0.18_260_/_0.35)] bg-[oklch(70%_0.18_260_/_0.06)] px-1.5 py-0.5 text-[10px] font-medium text-[oklch(70%_0.18_260)]">
+                              SAML
+                            </span>
+                          </Tooltip>
+                        )}
+                      </div>
                     </TableCell>
                     <TableCell className="font-mono text-xs text-muted-foreground">
                       {c.virtual_cidr}
@@ -1547,6 +1909,104 @@ export function ClientsPage() {
                 </p>
               )}
             </div>
+            {editForm.auth_method === 'otp' && (
+              <div className="md:col-span-2 rounded-md border border-border bg-popover px-3 py-2.5 text-sm">
+                <p className="font-medium">🔐 Auto-OTP (TOTP RFC 6238)</p>
+                <p className="mt-0.5 text-[11px] text-muted-foreground">
+                  Cadastre o <strong>seed TOTP</strong> do user da VPN — VAGG
+                  gera o código de 6 dígitos automaticamente a cada conexão.
+                  Compatível com Microsoft Authenticator, Google Authenticator,
+                  FortiToken, 1Password, etc. Seed é cifrado at-rest com Fernet.
+                </p>
+
+                {totpInfo?.has_secret ? (
+                  <div className="mt-3 rounded border border-[oklch(72%_0.16_160_/_0.3)] bg-[oklch(72%_0.16_160_/_0.08)] px-3 py-2 text-[12px]">
+                    <p className="text-[oklch(72%_0.16_160)]">
+                      ✓ Auto-OTP ativo
+                      {totpInfo.issuer && (
+                        <span className="text-muted-foreground">
+                          {' '}— {totpInfo.issuer}
+                          {totpInfo.account ? ` · ${totpInfo.account}` : ''}
+                        </span>
+                      )}
+                    </p>
+                    <p className="mt-0.5 text-[11px] text-muted-foreground">
+                      {totpInfo.digits ?? 6} dígitos / {totpInfo.period ?? 30}s /{' '}
+                      {(totpInfo.algorithm ?? 'sha1').toUpperCase()}
+                    </p>
+                    {totpPreview && (
+                      <p className="mt-2 font-mono text-lg tracking-widest">
+                        {totpPreview.code}{' '}
+                        <span className="ml-2 text-[11px] text-muted-foreground">
+                          (expira em {totpPreview.seconds}s)
+                        </span>
+                      </p>
+                    )}
+                    <div className="mt-2 flex gap-2">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        disabled={totpBusy}
+                        onClick={previewTotpCode}
+                      >
+                        Testar agora
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        disabled={totpBusy}
+                        onClick={removeTotpSeed}
+                      >
+                        Remover seed
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="mt-3 rounded border border-[oklch(78%_0.14_75_/_0.3)] bg-[oklch(78%_0.14_75_/_0.06)] px-3 py-2 text-[12px]">
+                    <p className="text-[oklch(78%_0.14_75)]">
+                      ⚠ Sem seed cadastrado — Conectar vai pedir 6 dígitos
+                      manualmente toda vez.
+                    </p>
+                  </div>
+                )}
+
+                <Field
+                  label={
+                    totpInfo?.has_secret
+                      ? 'Substituir seed (base32 ou otpauth://)'
+                      : 'Cadastrar seed (base32 ou otpauth://)'
+                  }
+                  hint="Cole o segredo do QR code (Microsoft Authenticator → ⋮ → Exportar/Mostrar código) ou a URI otpauth://"
+                >
+                  <textarea
+                    className="min-h-[60px] w-full rounded border border-border bg-background px-2.5 py-1.5 font-mono text-[12px]"
+                    value={totpInput}
+                    onChange={(e) => setTotpInput(e.target.value)}
+                    placeholder="JBSWY3DPEHPK3PXP  ou  otpauth://totp/Acme:alice?secret=..."
+                    autoComplete="off"
+                  />
+                </Field>
+                <div className="mt-2 flex justify-end">
+                  <Button
+                    type="button"
+                    size="sm"
+                    disabled={totpBusy || !totpInput.trim()}
+                    onClick={saveTotpSeed}
+                  >
+                    {totpBusy ? (
+                      <>
+                        <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
+                        Salvando…
+                      </>
+                    ) : (
+                      'Salvar seed'
+                    )}
+                  </Button>
+                </div>
+              </div>
+            )}
             {(editing.vpn_type === 'globalprotect' || editing.vpn_type === 'openfortivpn') &&
               editForm.auth_method === 'saml' && (
               <div className="md:col-span-2 rounded-md border border-border bg-popover px-3 py-2.5 text-sm">
@@ -1687,6 +2147,213 @@ export function ClientsPage() {
             Tipicamente 6 dígitos. O código é entregue uma única vez ao container do
             túnel via canal seguro (não fica salvo).
           </p>
+        </div>
+      </Modal>
+
+      {/* ── Modal SAML-LOGIN — FortiGate via openfortivpn --saml-login.
+          Embarca noVNC do saml-portal (Firefox no servidor) num iframe.
+          User completa o login Microsoft no iframe; o Firefox segue o
+          redirect 127.0.0.1 direto pro openfortivpn no mesmo loopback do
+          servidor — sem copy/paste nem erro de cert no browser do user. */}
+      <Modal
+        open={!!samlLoginFor}
+        onClose={() => {
+          if (!samlLoginBusy) {
+            setSamlLoginFor(null);
+            setSamlLoginPortalUrl(null);
+          }
+        }}
+        title={samlLoginFor ? `Conectar ${samlLoginFor.name} · SSO Microsoft` : ''}
+        description={
+          samlLoginPhase === 'starting'
+            ? 'Subindo conexão…'
+            : samlLoginPhase === 'connecting'
+            ? 'Túnel subindo…'
+            : samlLoginPhase === 'connected'
+            ? 'Túnel UP!'
+            : 'Complete o login Microsoft na janela popup.'
+        }
+        size="lg"
+        footer={
+          <Button
+            variant="outline"
+            onClick={() => {
+              if (!samlLoginBusy) {
+                setSamlLoginFor(null);
+                setSamlLoginPortalUrl(null);
+                setSamlLoginStartUrl(null);
+              }
+            }}
+            disabled={samlLoginBusy}
+          >
+            {samlLoginPhase === 'connected' ? 'Fechar' : 'Cancelar'}
+          </Button>
+        }
+      >
+        <div className="space-y-4">
+          {samlLoginPhase === 'starting' && (
+            <div className="py-12 text-center text-sm text-muted-foreground">
+              Subindo… aguarde 5-10s.
+            </div>
+          )}
+          {samlLoginPhase !== 'starting' && (
+            <>
+              {vaggExtInstalled ? (
+                // Caminho 100% automático: extensão captura o redirect
+                <>
+                  <div className="rounded-md border border-green-700/40 bg-green-950/30 p-3 text-sm">
+                    <div className="flex items-center gap-2 text-green-400 font-medium mb-1">
+                      <span>✓ Extensão VAGG SAML Relay detectada</span>
+                    </div>
+                    <p className="text-muted-foreground text-xs">
+                      Conexão 100% automática. Complete o login na janela popup
+                      — o túnel sobe sozinho.
+                    </p>
+                  </div>
+                  <ol className="list-decimal pl-5 text-sm space-y-1 text-muted-foreground">
+                    <li>
+                      Janela popup abriu com login Microsoft.
+                      {samlLoginStartUrl && (
+                        <>
+                          {' '}Não abriu?{' '}
+                          <a
+                            className="text-primary underline"
+                            href={samlLoginStartUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                          >
+                            abra aqui
+                          </a>
+                          .
+                        </>
+                      )}
+                    </li>
+                    <li>Faça login + aprove push no Authenticator.</li>
+                    <li>
+                      A extensão captura o resultado automaticamente. Modal
+                      fecha quando o túnel subir.
+                    </li>
+                  </ol>
+                  {samlLoginPhase === 'connecting' && (
+                    <div className="text-sm text-center py-2 text-primary">
+                      Túnel subindo… aguarde alguns segundos.
+                    </div>
+                  )}
+                  {samlLoginPhase === 'connected' && (
+                    <div className="text-sm text-center py-2 text-green-500">
+                      ✓ Conectado!
+                    </div>
+                  )}
+                </>
+              ) : (
+                // Fallback: extensão não detectada → clipboard / paste manual
+                <>
+                  <div className="rounded-md border border-amber-700/40 bg-amber-950/30 p-3 text-sm">
+                    <div className="text-amber-400 font-medium mb-1">
+                      ⚠ Extensão VAGG SAML Relay não detectada
+                    </div>
+                    <p className="text-muted-foreground text-xs">
+                      Instale a extensão pra conexão 100% automática.{' '}
+                      <a
+                        className="text-primary underline"
+                        href="/downloads/vagg-saml-relay-ext.zip"
+                        download
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        Baixar extensão
+                      </a>
+                      . Sem ela, copie a URL manualmente.
+                    </p>
+                  </div>
+                  <ol className="list-decimal pl-5 text-sm space-y-2">
+                    <li>
+                      Janela popup abriu com login Microsoft.
+                      {samlLoginStartUrl && (
+                        <>
+                          {' '}Não abriu?{' '}
+                          <a
+                            className="text-primary underline"
+                            href={samlLoginStartUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                          >
+                            abra aqui
+                          </a>
+                          .
+                        </>
+                      )}
+                    </li>
+                    <li>Faça login + aprove push.</li>
+                    <li>
+                      Quando aparecer{' '}
+                      <code className="text-foreground">
+                        ERR_CONNECTION_REFUSED
+                      </code>{' '}
+                      em <code className="text-foreground">127.0.0.1:8020</code>:{' '}
+                      <strong>Ctrl+L</strong>, <strong>Ctrl+C</strong>, volte
+                      aqui.
+                    </li>
+                  </ol>
+                  <div className="flex flex-col gap-2 pt-2">
+                    <Button
+                      onClick={submitSamlLoginFromClipboard}
+                      disabled={
+                        samlLoginBusy ||
+                        samlLoginPhase === 'connecting' ||
+                        samlLoginPhase === 'connected'
+                      }
+                      className="w-full"
+                      size="lg"
+                    >
+                      {samlLoginBusy
+                        ? 'Enviando…'
+                        : samlLoginPhase === 'connecting'
+                        ? 'Túnel subindo…'
+                        : samlLoginPhase === 'connected'
+                        ? '✓ Conectado'
+                        : '📋 Já copiei a URL — Conectar'}
+                    </Button>
+                    <details className="text-xs text-muted-foreground border border-border rounded p-2">
+                      <summary className="cursor-pointer select-none">
+                        Clipboard não funcionou? Cole manualmente
+                      </summary>
+                      <div className="mt-2 space-y-2">
+                        <Input
+                          type="text"
+                          placeholder="http://127.0.0.1:8020/?id=..."
+                          value={samlLoginPasteUrl}
+                          onChange={(e) => setSamlLoginPasteUrl(e.target.value)}
+                          disabled={
+                            samlLoginBusy || samlLoginPhase === 'connected'
+                          }
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' && samlLoginPasteUrl.trim()) {
+                              e.preventDefault();
+                              void submitSamlLoginUrl();
+                            }
+                          }}
+                        />
+                        <Button
+                          onClick={submitSamlLoginUrl}
+                          disabled={
+                            samlLoginBusy ||
+                            !samlLoginPasteUrl.trim() ||
+                            samlLoginPhase === 'connected'
+                          }
+                          size="sm"
+                          variant="outline"
+                          className="w-full"
+                        >
+                          Enviar URL colada
+                        </Button>
+                      </div>
+                    </details>
+                  </div>
+                </>
+              )}
+            </>
+          )}
         </div>
       </Modal>
 

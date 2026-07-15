@@ -1,0 +1,68 @@
+# dev/lab-vpn — laboratório self-contained pra testar uma conexão VPN real
+# de ponta a ponta com o vagg-aggregator.
+#
+# Sobe DOIS serviços que simulam "a rede de um cliente final":
+#
+#   1) vpn-server (kylemanna/openvpn) — servidor OpenVPN ouvindo em UDP/1194.
+#      Subnet do cliente "fake": 192.168.99.0/24
+#
+#   2) lan-asset (nginx) — um recurso "interno" que só é alcançável depois
+#      que o consultor está conectado à VPN. Ouve em :80 com IP fixo
+#      192.168.99.10 dentro da rede docker do servidor OpenVPN.
+#
+# Esta stack é completamente independente do vagg-* — ela apenas EXISTE como
+# "o cliente" pro vagg agregar. Você pode subi-la em qualquer host com
+# Docker.
+#
+# Uso (a partir de dev/lab-vpn):
+#   ./setup.sh           # gera PKI + client.ovpn (uma vez)
+#   docker compose up -d
+#   # cliente disponível em <ip-deste-host>:1194 UDP
+#
+# Limpar:
+#   docker compose down -v   # apaga PKI também
+
+name: vagg-lab-vpn
+
+networks:
+  cliente_lan:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 192.168.99.0/24
+
+volumes:
+  ovpn_data:
+
+services:
+  # ---------------------------------------------------------------- VPN server
+  # Imagem: https://github.com/kylemanna/docker-openvpn (MIT) — padrão de fato
+  # pra subir um servidor OpenVPN num container. Mantém EasyRSA + scripts pra
+  # init de PKI e gerar .ovpn de cliente.
+  vpn-server:
+    image: kylemanna/openvpn:2.4
+    container_name: lab-vpn-server
+    cap_add:
+      - NET_ADMIN
+    ports:
+      - "1194:1194/udp"
+    volumes:
+      - ovpn_data:/etc/openvpn
+    networks:
+      cliente_lan:
+        ipv4_address: 192.168.99.2
+    restart: unless-stopped
+
+  # ------------------------------------------------------------ Recurso interno
+  # Quando o vagg conectar a VPN, este nginx vai ficar visível em
+  # 192.168.99.10 (real) → 10.200.99.10 (virtual) se o admin mapear o cliente
+  # com virtual_cidr=10.200.99.0/24 e real_cidr=192.168.99.0/24.
+  lan-asset:
+    image: nginx:1.27-alpine
+    container_name: lab-vpn-asset
+    networks:
+      cliente_lan:
+        ipv4_address: 192.168.99.10
+    volumes:
+      - ./asset-html:/usr/share/nginx/html:ro
+    restart: unless-stopped

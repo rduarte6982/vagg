@@ -1,0 +1,388 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8"/>
+<title>VAGG · Kit de marketing</title>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap"/>
+<link rel="stylesheet" href="brand.css"/>
+<style>
+  body { background: #1a1c20; padding: 56px 40px; color: var(--ink); }
+  .wrap { max-width: 1500px; margin: 0 auto; }
+  .ttl { font-family: var(--font-mono); font-weight: 600; font-size: 32px; margin: 0 0 8px; }
+  .hint { color: var(--ink-3); font-size: 14px; margin-bottom: 40px; }
+  h2.section {
+    font-family: var(--font-mono); font-size: 12px; letter-spacing: .18em;
+    text-transform: uppercase; color: var(--ink-3); margin: 56px 0 18px;
+    border-top: 1px solid var(--line); padding-top: 22px;
+  }
+  .row { display: flex; flex-wrap: wrap; gap: 28px; }
+  .frame { display: flex; flex-direction: column; gap: 8px; }
+  .frame .meta { font-family: var(--font-mono); font-size: 11px; color: var(--ink-4); letter-spacing: .14em; text-transform: uppercase; }
+  .frame .art {
+    border-radius: 6px; overflow: hidden;
+    box-shadow: 0 14px 40px rgba(0,0,0,.4);
+    background: var(--bg-2);
+    position: relative;
+    color: var(--ink);
+  }
+  .frame .art .vagg-mark .node { fill: currentColor; }
+  .frame .art .vagg-mark .wire { stroke: currentColor; opacity: .55; }
+
+  /* Common building blocks */
+  .vmark { display:inline-flex; align-items:center; gap: 8px; }
+  .vmark span { font-family: var(--font-mono); font-weight:600; }
+  .vmark .dot { color: var(--signal); }
+
+  /* ───── BANNERS ───── */
+  /* leaderboard 728×90 */
+  .b-728 { width: 728px; height: 90px; padding: 16px 24px; display: flex; align-items: center; justify-content: space-between; background: var(--bg); border: 1px solid var(--line); }
+  .b-728 .head { display: flex; align-items: center; gap: 28px; }
+  .b-728 .vmark span { font-size: 18px; }
+  .b-728 .vagg-mark { width: 26px; height: 26px; }
+  .b-728 .copy { font-family: var(--font-sans); font-size: 16px; line-height: 1.3; max-width: 360px; }
+  .b-728 .copy b { color: var(--signal); font-weight: 600; }
+  .b-728 .cta { background: var(--signal); color: var(--signal-ink); padding: 10px 18px; border-radius: 8px; font-family: var(--font-mono); font-size: 13px; font-weight: 600; }
+
+  /* skyscraper 300×600 */
+  .b-300x600 { width: 300px; height: 600px; padding: 28px; background: var(--bg); border: 1px solid var(--line); display: flex; flex-direction: column; justify-content: space-between; }
+  .b-300x600 .vagg-mark { width: 28px; height: 28px; }
+  .b-300x600 .vmark span { font-size: 18px; }
+  .b-300x600 h3 { font-family: var(--font-mono); font-size: 32px; line-height: 1.05; letter-spacing: -.02em; margin: 28px 0 18px; }
+  .b-300x600 h3 .ac { color: var(--signal); }
+  .b-300x600 p { font-size: 13px; color: var(--ink-2); line-height: 1.5; }
+  .b-300x600 .vis svg { width: 100%; height: 180px; }
+  .b-300x600 .cta { background: var(--signal); color: var(--signal-ink); padding: 12px; border-radius: 8px; font-family: var(--font-mono); font-size: 13px; font-weight: 600; text-align: center; }
+
+  /* medium rect 300×250 */
+  .b-300x250 { width: 300px; height: 250px; padding: 22px; background: var(--bg-2); border: 1px solid var(--line); display: flex; flex-direction: column; justify-content: space-between; }
+  .b-300x250 .vagg-mark { width: 22px; height: 22px; }
+  .b-300x250 .vmark span { font-size: 14px; }
+  .b-300x250 h3 { font-family: var(--font-mono); font-size: 22px; line-height: 1.1; margin: 10px 0 0; }
+  .b-300x250 h3 .ac { color: var(--signal); }
+  .b-300x250 .cta { font-family: var(--font-mono); font-size: 12px; color: var(--signal); display: flex; align-items: center; gap: 6px; }
+
+  /* ───── LINKEDIN ───── */
+  /* feed 1200×627 */
+  .li-feed { width: 600px; height: 314px; padding: 36px 40px; background: var(--bg); position: relative; overflow: hidden; }
+  .li-feed::before { content: ""; position: absolute; right:-80px; top:-80px; width:300px; height:300px; border-radius: 999px; background: oklch(78% 0.16 162 / 0.08); }
+  .li-feed .vagg-mark { width: 26px; height: 26px; }
+  .li-feed .vmark { margin-bottom: 22px; }
+  .li-feed .vmark span { font-size: 18px; }
+  .li-feed h3 { font-family: var(--font-mono); font-size: 36px; line-height: 1.05; letter-spacing: -.02em; margin: 0; max-width: 480px; }
+  .li-feed h3 .ac { color: var(--signal); }
+  .li-feed .foot { position: absolute; bottom: 28px; left: 40px; right: 40px; display: flex; justify-content: space-between; align-items: flex-end; }
+  .li-feed .tag { font-family: var(--font-mono); font-size: 12px; color: var(--ink-3); letter-spacing: .14em; text-transform: uppercase; }
+  .li-feed .url { font-family: var(--font-mono); font-size: 12px; color: var(--signal); }
+
+  /* linkedin square 1080×1080 (rendered 360×360) */
+  .li-sq { width: 360px; height: 360px; padding: 28px; background: var(--paper); color: var(--ink-on-paper); position: relative; }
+  .li-sq .vmark span { color: var(--ink-on-paper); font-size: 16px; }
+  .li-sq .vagg-mark { width: 22px; height: 22px; color: var(--ink-on-paper); }
+  .li-sq h3 { font-family: var(--font-mono); font-size: 28px; line-height: 1.05; letter-spacing: -.02em; margin: 24px 0 0; max-width: 280px; }
+  .li-sq h3 .ac { color: oklch(48% 0.12 162); }
+  .li-sq .foot { position: absolute; bottom: 22px; left: 28px; right: 28px; font-family: var(--font-mono); font-size: 11px; color: #6b7280; letter-spacing: .14em; text-transform: uppercase; display: flex; justify-content: space-between;}
+  .li-sq .stat { position: absolute; right: 28px; top: 28px; text-align: right; font-family: var(--font-mono); font-size: 11px; color: #6b7280; letter-spacing: .12em; text-transform: uppercase; }
+  .li-sq .stat b { display: block; font-size: 28px; color: var(--ink-on-paper); letter-spacing: -.01em; text-transform: none; margin-top: 4px; }
+
+  /* ───── INSTAGRAM ───── */
+  .ig-post { width: 320px; height: 320px; background: var(--bg); padding: 28px; position: relative; overflow: hidden; }
+  .ig-post .vagg-mark { width: 22px; height: 22px; }
+  .ig-post .vmark span { font-size: 14px; }
+  .ig-post h3 { font-family: var(--font-mono); font-size: 26px; line-height: 1.05; letter-spacing: -.02em; margin: 60px 0 0; }
+  .ig-post h3 .ac { color: var(--signal); }
+  .ig-post .num { position: absolute; bottom: 22px; right: 24px; font-family: var(--font-mono); font-size: 11px; color: var(--ink-3); letter-spacing: .14em; }
+  .ig-post.dark { background: var(--bg-3); }
+  .ig-post.signal { background: var(--signal); color: var(--signal-ink); }
+  .ig-post.signal .vagg-mark .node { fill: var(--signal-ink); }
+  .ig-post.signal .vagg-mark .core { fill: white; }
+  .ig-post.signal .vagg-mark .wire { stroke: var(--signal-ink); }
+  .ig-post.signal .vmark span { color: var(--signal-ink); }
+  .ig-post.signal .vmark .dot { color: var(--signal-ink); }
+  .ig-post.signal h3 .ac { color: white; }
+  .ig-post.signal .num { color: var(--signal-ink); }
+
+  /* IG story 1080×1920 → 200×356 */
+  .ig-story { width: 200px; height: 356px; padding: 22px; background: var(--bg); position: relative; }
+  .ig-story .vagg-mark { width: 18px; height: 18px; }
+  .ig-story .vmark span { font-size: 12px; }
+  .ig-story h3 { font-family: var(--font-mono); font-size: 22px; line-height: 1.05; margin: 28px 0; }
+  .ig-story h3 .ac { color: var(--signal); }
+  .ig-story .swipe { position: absolute; bottom: 22px; left: 22px; right: 22px; padding: 10px; border: 1px solid var(--line-2); border-radius: 999px; text-align: center; font-family: var(--font-mono); font-size: 11px; color: var(--ink-2); }
+  .ig-story .stat { font-family: var(--font-mono); font-size: 11px; color: var(--ink-3); letter-spacing: .14em; text-transform: uppercase; }
+  .ig-story .stat b { color: var(--signal); display: block; font-size: 36px; margin-top: 4px; letter-spacing: -.01em; text-transform: none; }
+
+  /* ───── YOUTUBE ───── */
+  .yt-thumb { width: 640px; height: 360px; padding: 38px 44px; background: var(--bg); position: relative; overflow: hidden; }
+  .yt-thumb::before { content: ""; position: absolute; right: -120px; bottom: -120px; width: 380px; height: 380px; border-radius: 999px; background: oklch(78% 0.16 162 / 0.08); }
+  .yt-thumb .vagg-mark { width: 32px; height: 32px; }
+  .yt-thumb .vmark span { font-size: 22px; }
+  .yt-thumb h3 { font-family: var(--font-mono); font-size: 56px; font-weight: 600; line-height: 1.0; letter-spacing: -.025em; margin: 28px 0; max-width: 480px; }
+  .yt-thumb h3 .ac { color: var(--signal); }
+  .yt-thumb .duration { position: absolute; bottom: 32px; right: 32px; padding: 6px 12px; background: rgba(0,0,0,.7); border-radius: 4px; font-family: var(--font-mono); font-size: 14px; color: white; }
+  .yt-thumb .duration::before { content: "▶ "; color: var(--signal); }
+  .yt-thumb .badge { position: absolute; top: 32px; right: 32px; font-family: var(--font-mono); font-size: 11px; color: var(--signal); letter-spacing: .18em; text-transform: uppercase; padding: 6px 12px; border: 1px solid var(--signal); border-radius: 4px; }
+
+  /* YT channel banner 2560×1440 (safe zone 1546×423) → render 800×142 */
+  .yt-banner { width: 800px; height: 142px; padding: 22px 32px; background: var(--bg); display: flex; align-items: center; justify-content: space-between; position: relative; overflow: hidden; }
+  .yt-banner::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; background: var(--signal); }
+  .yt-banner .vagg-mark { width: 28px; height: 28px; }
+  .yt-banner .vmark span { font-size: 18px; }
+  .yt-banner h3 { font-family: var(--font-mono); font-size: 22px; margin: 8px 0 0; line-height: 1.1; }
+  .yt-banner h3 .ac { color: var(--signal); }
+  .yt-banner .meta { font-family: var(--font-mono); font-size: 11px; color: var(--ink-3); letter-spacing: .14em; text-transform: uppercase; text-align: right; }
+  .yt-banner .meta b { color: var(--signal); display: block; }
+
+  /* small mini topology svg */
+  .mini-topo { width: 100%; height: 80px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1 class="ttl">VAGG · Kit de marketing</h1>
+  <p class="hint">Banners para web ads, posts para LinkedIn / Instagram / YouTube. Tudo respeitando o sistema de marca: signal-green único, JetBrains Mono nas headlines, voz técnica e direta.</p>
+
+  <!-- ═══════════ BANNERS ═══════════ -->
+  <h2 class="section">Banners para web ads · IAB standard</h2>
+
+  <div class="row">
+    <div class="frame">
+      <div class="meta">leaderboard · 728×90</div>
+      <div class="art">
+        <div class="b-728">
+          <div class="head">
+            <div class="vmark">
+              <svg viewBox="0 0 28 28" class="vagg-mark"><circle class="node" cx="4" cy="4" r="2"/><circle class="node" cx="24" cy="4" r="2"/><circle class="node" cx="4" cy="24" r="2"/><circle class="node" cx="24" cy="24" r="2"/><path class="wire" d="M4 4 L14 14"/><path class="wire" d="M24 4 L14 14"/><path class="wire" d="M4 24 L14 14"/><path class="wire" d="M24 24 L14 14"/><rect class="core" x="10" y="10" width="8" height="8" rx="1.6"/></svg>
+              <span>vagg<span class="dot">.</span></span>
+            </div>
+            <div class="copy">Uma VPN. <b>Todos</b> os clientes da sua consultoria.</div>
+          </div>
+          <div class="cta">Trial 14 dias →</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="frame">
+      <div class="meta">medium rectangle · 300×250</div>
+      <div class="art">
+        <div class="b-300x250">
+          <div class="vmark">
+            <svg viewBox="0 0 28 28" class="vagg-mark"><circle class="node" cx="4" cy="4" r="2"/><circle class="node" cx="24" cy="4" r="2"/><circle class="node" cx="4" cy="24" r="2"/><circle class="node" cx="24" cy="24" r="2"/><path class="wire" d="M4 4 L14 14"/><path class="wire" d="M24 4 L14 14"/><path class="wire" d="M4 24 L14 14"/><path class="wire" d="M24 24 L14 14"/><rect class="core" x="10" y="10" width="8" height="8" rx="1.6"/></svg>
+            <span>vagg<span class="dot">.</span></span>
+          </div>
+          <h3>5 VPNs no notebook?<br/><span class="ac">Uma só.</span></h3>
+          <div class="cta">vagg.io/trial →</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="frame">
+      <div class="meta">half-page · 300×600</div>
+      <div class="art">
+        <div class="b-300x600">
+          <div class="vmark">
+            <svg viewBox="0 0 28 28" class="vagg-mark"><circle class="node" cx="4" cy="4" r="2"/><circle class="node" cx="24" cy="4" r="2"/><circle class="node" cx="4" cy="24" r="2"/><circle class="node" cx="24" cy="24" r="2"/><path class="wire" d="M4 4 L14 14"/><path class="wire" d="M24 4 L14 14"/><path class="wire" d="M4 24 L14 14"/><path class="wire" d="M24 24 L14 14"/><rect class="core" x="10" y="10" width="8" height="8" rx="1.6"/></svg>
+            <span>vagg<span class="dot">.</span></span>
+          </div>
+          <div>
+            <h3>Uma VPN.<br/><span class="ac">Todos</span> os clientes.</h3>
+            <p>Aggregator self-hosted para consultorias B2B. RBAC central, NAT atômico, audit imutável.</p>
+            <div class="vis" style="margin-top: 24px;">
+              <svg viewBox="0 0 240 180" class="mini-topo" style="height:160px;">
+                <g fill="#161a1f" stroke="#2c333b">
+                  <rect x="0" y="20" width="60" height="20" rx="4"/>
+                  <rect x="0" y="50" width="60" height="20" rx="4"/>
+                  <rect x="0" y="80" width="60" height="20" rx="4"/>
+                  <rect x="0" y="110" width="60" height="20" rx="4"/>
+                </g>
+                <rect x="100" y="60" width="60" height="50" rx="6" fill="oklch(78% 0.16 162)"/>
+                <text x="118" y="92" font-family="JetBrains Mono" font-size="11" fill="#103127">vagg</text>
+                <g fill="#161a1f" stroke="#2c333b">
+                  <rect x="180" y="20" width="60" height="20" rx="4"/>
+                  <rect x="180" y="50" width="60" height="20" rx="4"/>
+                  <rect x="180" y="80" width="60" height="20" rx="4"/>
+                  <rect x="180" y="110" width="60" height="20" rx="4"/>
+                </g>
+                <g stroke="oklch(78% 0.16 162)" stroke-width="1.4" fill="none" stroke-dasharray="3 3">
+                  <path d="M60 30 L100 75"/>
+                  <path d="M60 60 L100 85"/>
+                  <path d="M160 85 L180 30"/>
+                  <path d="M160 85 L180 60"/>
+                </g>
+                <g stroke="#2c333b" stroke-width="1.2" fill="none">
+                  <path d="M60 90 L100 95"/>
+                  <path d="M60 120 L100 100"/>
+                  <path d="M160 95 L180 90"/>
+                  <path d="M160 100 L180 120"/>
+                </g>
+              </svg>
+            </div>
+          </div>
+          <div class="cta">Trial 14 dias →</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════ LINKEDIN ═══════════ -->
+  <h2 class="section">LinkedIn · feed sponsored + post quadrado</h2>
+
+  <div class="row">
+    <div class="frame">
+      <div class="meta">linkedin sponsored · 1200×627 (escala 50%)</div>
+      <div class="art">
+        <div class="li-feed">
+          <div class="vmark">
+            <svg viewBox="0 0 28 28" class="vagg-mark"><circle class="node" cx="4" cy="4" r="2"/><circle class="node" cx="24" cy="4" r="2"/><circle class="node" cx="4" cy="24" r="2"/><circle class="node" cx="24" cy="24" r="2"/><path class="wire" d="M4 4 L14 14"/><path class="wire" d="M24 4 L14 14"/><path class="wire" d="M4 24 L14 14"/><path class="wire" d="M24 24 L14 14"/><rect class="core" x="10" y="10" width="8" height="8" rx="1.6"/></svg>
+            <span>vagg<span class="dot">.</span></span>
+          </div>
+          <h3>Sua consultoria não precisa<br/>de cinco clientes VPN.<br/><span class="ac">Precisa de um agregador.</span></h3>
+          <div class="foot">
+            <div class="tag">para consultorias B2B SAP · 20+ consultores</div>
+            <div class="url">vagg.io/trial</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="frame">
+      <div class="meta">linkedin post quadrado · 1080×1080</div>
+      <div class="art">
+        <div class="li-sq">
+          <div class="vmark">
+            <svg viewBox="0 0 28 28" class="vagg-mark on-paper"><circle class="node" cx="4" cy="4" r="2"/><circle class="node" cx="24" cy="4" r="2"/><circle class="node" cx="4" cy="24" r="2"/><circle class="node" cx="24" cy="24" r="2"/><path class="wire" d="M4 4 L14 14"/><path class="wire" d="M24 4 L14 14"/><path class="wire" d="M4 24 L14 14"/><path class="wire" d="M24 24 L14 14"/><rect class="core" x="10" y="10" width="8" height="8" rx="1.6"/></svg>
+            <span>vagg<span class="dot" style="color:oklch(48% 0.12 162)">.</span></span>
+          </div>
+          <div class="stat">tempo perdido entre vpns<b>R$ 30k/mês</b></div>
+          <h3>Cada cliente novo<br/>= mais um cliente VPN<br/>no notebook do <span class="ac">consultor</span>.</h3>
+          <div class="foot"><span>vagg.io · b2b vpn aggregator</span><span>→ trial</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════ INSTAGRAM ═══════════ -->
+  <h2 class="section">Instagram · carrossel de 3 + story</h2>
+
+  <div class="row">
+    <div class="frame">
+      <div class="meta">carrossel 1/3 · problema</div>
+      <div class="art">
+        <div class="ig-post">
+          <div class="vmark">
+            <svg viewBox="0 0 28 28" class="vagg-mark"><circle class="node" cx="4" cy="4" r="2"/><circle class="node" cx="24" cy="4" r="2"/><circle class="node" cx="4" cy="24" r="2"/><circle class="node" cx="24" cy="24" r="2"/><path class="wire" d="M4 4 L14 14"/><path class="wire" d="M24 4 L14 14"/><path class="wire" d="M4 24 L14 14"/><path class="wire" d="M24 24 L14 14"/><rect class="core" x="10" y="10" width="8" height="8" rx="1.6"/></svg>
+            <span>vagg<span class="dot">.</span></span>
+          </div>
+          <h3>Sua consultoria<br/>paga por <span class="ac">5 VPNs</span><br/>rodando ao mesmo<br/>tempo no notebook.</h3>
+          <div class="num">01 / 03 →</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="frame">
+      <div class="meta">carrossel 2/3 · números</div>
+      <div class="art">
+        <div class="ig-post dark">
+          <div class="vmark">
+            <svg viewBox="0 0 28 28" class="vagg-mark"><circle class="node" cx="4" cy="4" r="2"/><circle class="node" cx="24" cy="4" r="2"/><circle class="node" cx="4" cy="24" r="2"/><circle class="node" cx="24" cy="24" r="2"/><path class="wire" d="M4 4 L14 14"/><path class="wire" d="M24 4 L14 14"/><path class="wire" d="M4 24 L14 14"/><path class="wire" d="M24 24 L14 14"/><rect class="core" x="10" y="10" width="8" height="8" rx="1.6"/></svg>
+            <span>vagg<span class="dot">.</span></span>
+          </div>
+          <div style="margin-top: 50px;">
+            <div style="font-family:var(--font-mono); font-size:11px; color:var(--ink-3); letter-spacing:.14em; text-transform:uppercase;">tempo morto · 30 consultores</div>
+            <div style="font-family:var(--font-mono); font-size:60px; font-weight:600; color:var(--signal); letter-spacing:-.02em; margin-top: 10px;">R$ 30k</div>
+            <div style="font-family:var(--font-mono); font-size:13px; color:var(--ink-2); margin-top: 4px;">por mês · ralo aberto</div>
+          </div>
+          <div class="num">02 / 03 →</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="frame">
+      <div class="meta">carrossel 3/3 · solução</div>
+      <div class="art">
+        <div class="ig-post signal">
+          <div class="vmark">
+            <svg viewBox="0 0 28 28" class="vagg-mark"><circle class="node" cx="4" cy="4" r="2"/><circle class="node" cx="24" cy="4" r="2"/><circle class="node" cx="4" cy="24" r="2"/><circle class="node" cx="24" cy="24" r="2"/><path class="wire" d="M4 4 L14 14"/><path class="wire" d="M24 4 L14 14"/><path class="wire" d="M4 24 L14 14"/><path class="wire" d="M24 24 L14 14"/><rect class="core" x="10" y="10" width="8" height="8" rx="1.6"/></svg>
+            <span>vagg<span class="dot">.</span></span>
+          </div>
+          <h3>Uma VPN.<br/><span class="ac">Todos</span><br/>os clientes.<br/>vagg.io →</h3>
+          <div class="num">03 / 03</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="frame">
+      <div class="meta">instagram story · 1080×1920</div>
+      <div class="art">
+        <div class="ig-story">
+          <div class="vmark">
+            <svg viewBox="0 0 28 28" class="vagg-mark"><circle class="node" cx="4" cy="4" r="2"/><circle class="node" cx="24" cy="4" r="2"/><circle class="node" cx="4" cy="24" r="2"/><circle class="node" cx="24" cy="24" r="2"/><path class="wire" d="M4 4 L14 14"/><path class="wire" d="M24 4 L14 14"/><path class="wire" d="M4 24 L14 14"/><path class="wire" d="M24 24 L14 14"/><rect class="core" x="10" y="10" width="8" height="8" rx="1.6"/></svg>
+            <span>vagg<span class="dot">.</span></span>
+          </div>
+          <h3>Uma VPN.<br/><span class="ac">Todos</span><br/>os clientes.</h3>
+          <div class="stat">trial<b>14 dias</b></div>
+          <div class="swipe">↑ veja a demo de 90s</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════ YOUTUBE ═══════════ -->
+  <h2 class="section">YouTube · thumbnail + banner do canal</h2>
+
+  <div class="row">
+    <div class="frame">
+      <div class="meta">thumbnail · 1280×720 (escala 50%)</div>
+      <div class="art">
+        <div class="yt-thumb">
+          <div class="vmark">
+            <svg viewBox="0 0 28 28" class="vagg-mark"><circle class="node" cx="4" cy="4" r="2"/><circle class="node" cx="24" cy="4" r="2"/><circle class="node" cx="4" cy="24" r="2"/><circle class="node" cx="24" cy="24" r="2"/><path class="wire" d="M4 4 L14 14"/><path class="wire" d="M24 4 L14 14"/><path class="wire" d="M4 24 L14 14"/><path class="wire" d="M24 24 L14 14"/><rect class="core" x="10" y="10" width="8" height="8" rx="1.6"/></svg>
+            <span>vagg<span class="dot">.</span></span>
+          </div>
+          <span class="badge">demo</span>
+          <h3>5 VPNs.<br/>Um <span class="ac">notebook.</span><br/>Em 90 segundos.</h3>
+          <span class="duration">01:32</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="frame">
+      <div class="meta">channel banner · safe zone 1546×423</div>
+      <div class="art">
+        <div class="yt-banner">
+          <div>
+            <div class="vmark">
+              <svg viewBox="0 0 28 28" class="vagg-mark"><circle class="node" cx="4" cy="4" r="2"/><circle class="node" cx="24" cy="4" r="2"/><circle class="node" cx="4" cy="24" r="2"/><circle class="node" cx="24" cy="24" r="2"/><path class="wire" d="M4 4 L14 14"/><path class="wire" d="M24 4 L14 14"/><path class="wire" d="M4 24 L14 14"/><path class="wire" d="M24 24 L14 14"/><rect class="core" x="10" y="10" width="8" height="8" rx="1.6"/></svg>
+              <span>vagg<span class="dot">.</span></span>
+            </div>
+            <h3>Uma VPN. <span class="ac">Todos</span> os clientes.</h3>
+          </div>
+          <div class="meta">novo episódio toda quinta<b>vagg.io/yt</b></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════ COPY DECK ═══════════ -->
+  <h2 class="section">Copy deck · variações de headline</h2>
+  <div style="background: var(--bg-2); border: 1px solid var(--line); border-radius: 14px; padding: 28px 32px; font-size: 14px; line-height: 1.8; color: var(--ink-2);">
+    <div class="mono" style="color: var(--signal); font-size: 11px; letter-spacing: .14em; text-transform: uppercase; margin-bottom: 12px;">Linha curta · banners e thumbs</div>
+    <div>· Uma VPN. Todos os clientes.</div>
+    <div>· Cinco VPNs. Um notebook. Zero atrito.</div>
+    <div>· O agregador de VPNs que sua consultoria deveria ter contratado em 2022.</div>
+
+    <div class="mono" style="color: var(--signal); font-size: 11px; letter-spacing: .14em; text-transform: uppercase; margin: 24px 0 12px;">Linha média · LinkedIn</div>
+    <div>· Sua consultoria não precisa de cinco clientes VPN. Precisa de um agregador.</div>
+    <div>· Quando o auditor da Petrobras pergunta "quem acessou minha rede?", você responde com link, não com print.</div>
+    <div>· Tailscale resolve um problema. Pulse Secure resolve outro. VAGG resolve o seu.</div>
+
+    <div class="mono" style="color: var(--signal); font-size: 11px; letter-spacing: .14em; text-transform: uppercase; margin: 24px 0 12px;">Linha longa · descrições e ads</div>
+    <div>· VAGG é o agregador de túneis VPN para consultorias B2B que vivem entre cinco clientes ao mesmo tempo. Self-hosted, atrás da OpenVPN que você já tem. Sem cliente novo no notebook do consultor. Auditoria que faz seu cliente final renovar contrato.</div>
+  </div>
+
+  <p style="color: var(--ink-3); font-size: 13px; margin-top: 56px; padding-top: 22px; border-top: 1px solid var(--line);">Todos os formatos foram montados com HTML/CSS para serem editáveis diretamente. Para exportar PNG/JPG, abra cada frame e use captura de tela (cada frame está nas dimensões corretas / na escala indicada).</p>
+
+</div>
+</body>
+</html>

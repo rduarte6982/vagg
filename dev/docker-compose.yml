@@ -1,0 +1,90 @@
+# Stack de teste local — sobe core (FastAPI), Admin UI (nginx) e Portal
+# (nginx) com SQLite em volume.
+#
+# Diferenças vs produção:
+#  - vagg-core NÃO usa network_mode: host (não toca iptables/ip rule no host)
+#  - Sem TLS — UI HTTP em :8080, portal em :8081, API em :8443
+#  - DNS layer desabilitado (dns_enabled=false)
+#  - Sem auto-update
+#
+# Como rodar (a partir de dev/):
+#   1. ./bootstrap.sh    # gera dev.env com hash de senha + JWT secret
+#   2. docker compose --env-file dev.env up --build -d
+#   3. ./seed.sh         # opcional: popula clientes/consultores de exemplo
+#   4. abra http://localhost:8080
+#
+# Limpeza:
+#   docker compose down -v   # remove o volume de DB
+
+name: vagg-dev
+
+services:
+  vagg-core:
+    build:
+      context: ../core
+      dockerfile: Dockerfile
+    image: vagg/core:dev
+    restart: unless-stopped
+    environment:
+      VAGG_CORE_ENVIRONMENT: dev
+      VAGG_CORE_LOG_LEVEL: INFO
+      VAGG_CORE_BIND_HOST: 0.0.0.0
+      VAGG_CORE_BIND_PORT: 8443
+      VAGG_CORE_DATABASE_URL: sqlite+aiosqlite:////var/lib/vagg/db/vagg-core.db
+      VAGG_CORE_ADMIN_EMAIL: ${VAGG_ADMIN_EMAIL:-admin@vagg.local}
+      VAGG_CORE_ADMIN_PASSWORD_HASH: ${VAGG_ADMIN_PASSWORD_HASH}
+      VAGG_CORE_JWT_SECRET: ${VAGG_JWT_SECRET}
+      VAGG_CORE_JWT_ISSUER: vagg-dev
+      VAGG_CORE_NETWORK_APPLY_ENABLED: "false"
+      VAGG_CORE_DNS_ENABLED: "false"
+      VAGG_CORE_TUNNELS_HEALTH_ENABLED: "false"
+      VAGG_CORE_PORTAL_ENABLED: "true"
+      VAGG_CORE_PORTAL_SIGNING_KEY_PATH: /var/lib/vagg/portal-signing-key.pem
+      VAGG_CORE_TUNNELS_CONFIG_DIR: /var/lib/vagg/clients
+      VAGG_CORE_TUNNELS_SOCKETS_DIR: /var/lib/vagg/sockets
+      VAGG_CORE_DOMAIN: vpn.dev.local
+    ports:
+      - "8443:8443"
+    volumes:
+      - vagg_dev_data:/var/lib/vagg
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request,sys; urllib.request.urlopen('http://127.0.0.1:8443/api/v1/system/health', timeout=2)"
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 10s
+
+  vagg-ui:
+    build:
+      context: ../ui
+      dockerfile: Dockerfile
+    image: vagg/ui:dev
+    restart: unless-stopped
+    ports:
+      - "8080:80"
+    volumes:
+      # Distribuição de binários (instalador VAGG Client) — drop arquivos em
+      # ../downloads/ no host pra aparecerem em http://localhost:8080/downloads/.
+      - ../downloads:/var/www/downloads:ro
+    depends_on:
+      vagg-core:
+        condition: service_healthy
+
+  vagg-portal:
+    build:
+      context: ../portal
+      dockerfile: Dockerfile
+    image: vagg/portal:dev
+    restart: unless-stopped
+    ports:
+      - "8081:80"
+    depends_on:
+      vagg-core:
+        condition: service_healthy
+
+volumes:
+  vagg_dev_data:

@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 28 28" class="vagg-mark">
+  
+  <circle class="node" cx="4" cy="4" r="2"></circle>
+  <circle class="node" cx="24" cy="4" r="2"></circle>
+  <circle class="node" cx="4" cy="24" r="2"></circle>
+  <circle class="node" cx="24" cy="24" r="2"></circle>
+  
+  <path class="wire" d="M4 4  L14 14"></path>
+  <path class="wire" d="M24 4  L14 14"></path>
+  <path class="wire" d="M4 24 L14 14"></path>
+  <path class="wire" d="M24 24 L14 14"></path>
+  
+  <rect class="core" x="10" y="10" width="8" height="8" rx="1.6"></rect>
+</svg>

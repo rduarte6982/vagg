@@ -1,0 +1,772 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8"/>
+<title>VAGG — Uma VPN. Todos os clientes da sua consultoria.</title>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap"/>
+<link rel="stylesheet" href="brand.css"/>
+<style>
+  .page { max-width: 1280px; margin: 0 auto; padding: 0 40px; }
+
+  /* ── Nav ── */
+  nav.top {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 22px 0;
+    border-bottom: 1px solid var(--line);
+  }
+  nav.top .left { display: flex; align-items: center; gap: 38px; }
+  nav.top .brand { display: flex; align-items: center; gap: 10px; text-decoration: none; }
+  nav.top .links { display: flex; gap: 28px; }
+  nav.top .links a {
+    font-size: 14px; color: var(--ink-2); text-decoration: none;
+  }
+  nav.top .links a:hover { color: var(--ink); }
+  nav.top .right { display: flex; align-items: center; gap: 12px; }
+
+  /* ── Hero ── */
+  .hero {
+    padding: 96px 0 80px;
+    display: grid;
+    grid-template-columns: 1.1fr 0.9fr;
+    gap: 80px;
+    align-items: center;
+    border-bottom: 1px solid var(--line);
+  }
+  .hero h1 {
+    font-family: var(--font-mono); font-weight: 600;
+    font-size: 64px; line-height: 1.02; letter-spacing: -0.02em;
+    margin: 16px 0 24px;
+    text-wrap: balance;
+  }
+  .hero h1 .accent { color: var(--signal); }
+  .hero p.sub {
+    font-size: 19px; line-height: 1.55; color: var(--ink-2);
+    max-width: 540px; margin: 0 0 36px;
+    text-wrap: pretty;
+  }
+  .hero .cta-row { display: flex; gap: 12px; align-items: center; }
+  .hero .cta-row .note { font-size: 13px; color: var(--ink-3); margin-left: 8px; font-family: var(--font-mono); }
+
+  /* ── Hero diagram ── */
+  .diagram {
+    background: var(--bg-2);
+    border: 1px solid var(--line);
+    border-radius: var(--r-3);
+    padding: 28px;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    position: relative;
+    overflow: hidden;
+  }
+  .diagram::before {
+    content: "vagg.diagram"; position: absolute; top: 12px; right: 14px;
+    color: var(--ink-4); font-size: 10px; letter-spacing: .14em; text-transform: uppercase;
+  }
+  .diagram .head {
+    display: flex; gap: 6px; margin-bottom: 18px;
+  }
+  .diagram .head span {
+    width: 10px; height: 10px; border-radius: 999px; background: var(--line-2);
+  }
+
+  .topology { width: 100%; height: 360px; }
+  .topology .label { fill: var(--ink-2); font-family: var(--font-mono); font-size: 11px; }
+  .topology .label-mute { fill: var(--ink-3); font-family: var(--font-mono); font-size: 10px; }
+  .topology .node-rect { fill: var(--bg-3); stroke: var(--line-2); stroke-width: 1; }
+  .topology .core-rect { fill: var(--signal); }
+  .topology .core-text { fill: var(--signal-ink); font-family: var(--font-mono); font-size: 11px; font-weight: 600; }
+  .topology .wire-dim { stroke: var(--line-2); stroke-width: 1.2; fill: none; }
+  .topology .wire-live { stroke: var(--signal); stroke-width: 1.4; fill: none; stroke-dasharray: 3 3;
+                         animation: flow 1.4s linear infinite; }
+  @keyframes flow { to { stroke-dashoffset: -12; } }
+
+  /* ── Trust bar ── */
+  .trust {
+    padding: 36px 0;
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 40px;
+    border-bottom: 1px solid var(--line);
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--ink-3);
+    letter-spacing: .08em;
+    text-transform: uppercase;
+  }
+  .trust span:first-child { color: var(--ink-2); }
+
+  /* ── Section ── */
+  section.s { padding: 110px 0; border-bottom: 1px solid var(--line); }
+  section.s .hgroup { max-width: 720px; margin-bottom: 64px; }
+  section.s h2 {
+    font-family: var(--font-mono);
+    font-size: 44px; font-weight: 600; line-height: 1.05;
+    letter-spacing: -.02em;
+    margin: 12px 0 18px;
+    text-wrap: balance;
+  }
+  section.s h2 .accent { color: var(--signal); }
+  section.s .blurb { font-size: 18px; line-height: 1.6; color: var(--ink-2); }
+
+  /* ── Problem ── */
+  .pain-grid {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px;
+    background: var(--line);
+    border: 1px solid var(--line);
+    border-radius: var(--r-3);
+    overflow: hidden;
+  }
+  .pain {
+    background: var(--bg);
+    padding: 32px;
+  }
+  .pain .num {
+    font-family: var(--font-mono); font-size: 12px; color: var(--ink-3);
+    letter-spacing: .14em; text-transform: uppercase;
+  }
+  .pain .cost {
+    font-family: var(--font-mono); font-size: 32px; font-weight: 600; color: var(--ink);
+    margin: 14px 0 6px; letter-spacing: -.01em;
+  }
+  .pain .cost .unit { font-size: 14px; color: var(--ink-3); margin-left: 4px; }
+  .pain h3 { margin: 0 0 8px; font-size: 16px; font-weight: 600; }
+  .pain p  { margin: 0; color: var(--ink-2); font-size: 14px; line-height: 1.55; }
+
+  /* ── How it works ── */
+  .how {
+    display: grid; grid-template-columns: 380px 1fr; gap: 64px;
+    align-items: start;
+  }
+  .how-steps { display: flex; flex-direction: column; gap: 4px; }
+  .how-step {
+    padding: 22px 24px;
+    border: 1px solid var(--line);
+    border-radius: var(--r-2);
+    background: var(--bg-2);
+    cursor: pointer;
+    transition: border-color .2s, background .2s;
+  }
+  .how-step.active { border-color: var(--signal); background: var(--bg-3); }
+  .how-step .lbl { font-family: var(--font-mono); font-size: 11px; color: var(--ink-3); letter-spacing: .14em; }
+  .how-step.active .lbl { color: var(--signal); }
+  .how-step h4 { margin: 6px 0 4px; font-size: 16px; font-weight: 600; }
+  .how-step p  { margin: 0; color: var(--ink-2); font-size: 14px; line-height: 1.5; }
+
+  .terminal {
+    background: var(--bg-2);
+    border: 1px solid var(--line);
+    border-radius: var(--r-3);
+    padding: 0;
+    overflow: hidden;
+    height: 100%;
+    min-height: 460px;
+  }
+  .terminal .bar {
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--line);
+    display: flex; align-items: center; gap: 10px;
+  }
+  .terminal .bar .lights { display: flex; gap: 5px; }
+  .terminal .bar .lights span { width: 9px; height: 9px; border-radius: 999px; background: var(--line-2); }
+  .terminal .bar .title { font-family: var(--font-mono); font-size: 11px; color: var(--ink-3); }
+  .terminal .body {
+    padding: 28px 32px;
+    font-family: var(--font-mono); font-size: 13px; line-height: 1.7;
+    color: var(--ink-2);
+    height: 400px;
+    overflow: hidden;
+  }
+  .terminal .body .prompt { color: var(--signal); }
+  .terminal .body .cmd { color: var(--ink); }
+  .terminal .body .out  { color: var(--ink-3); }
+  .terminal .body .ok   { color: var(--signal); }
+  .terminal .body .warn { color: oklch(78% .14 75); }
+
+  /* ── Three pillars ── */
+  .pillars {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px;
+  }
+  .pillar {
+    padding: 36px;
+    border: 1px solid var(--line);
+    border-radius: var(--r-3);
+    background: var(--bg-2);
+    display: flex; flex-direction: column;
+    min-height: 320px;
+  }
+  .pillar .ico {
+    width: 36px; height: 36px;
+    border: 1px solid var(--line-2); border-radius: var(--r-2);
+    display: flex; align-items: center; justify-content: center;
+    margin-bottom: 24px;
+    color: var(--signal);
+  }
+  .pillar h3 { margin: 0 0 10px; font-size: 20px; font-weight: 600; letter-spacing: -.01em; }
+  .pillar p  { margin: 0 0 24px; color: var(--ink-2); font-size: 14px; line-height: 1.6; }
+  .pillar .feat-list { margin-top: auto; padding: 0; list-style: none; border-top: 1px dashed var(--line); }
+  .pillar .feat-list li { padding: 10px 0; font-family: var(--font-mono); font-size: 12px; color: var(--ink-3); border-bottom: 1px dashed var(--line); }
+  .pillar .feat-list li:last-child { border: none; }
+  .pillar .feat-list li::before { content: "→ "; color: var(--signal); margin-right: 6px; }
+
+  /* ── Audit / portal preview ── */
+  .audit-block {
+    display: grid; grid-template-columns: 1fr 1.2fr; gap: 64px; align-items: center;
+  }
+  .audit-mock {
+    background: var(--paper); color: var(--ink-on-paper);
+    border-radius: var(--r-3);
+    padding: 28px 32px;
+    font-family: var(--font-sans);
+    box-shadow: var(--shadow-2);
+  }
+  .audit-mock .head {
+    display: flex; align-items: baseline; justify-content: space-between;
+    border-bottom: 1px solid var(--paper-3);
+    padding-bottom: 14px; margin-bottom: 18px;
+  }
+  .audit-mock .head .t { font-family: var(--font-mono); font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: #6b7280; }
+  .audit-mock .head .v { font-family: var(--font-mono); font-size: 12px; color: #6b7280; }
+  .audit-mock h4 { margin: 0; font-size: 22px; font-weight: 600; }
+  .audit-mock .sub { font-size: 13px; color: #4b5563; margin-top: 4px; }
+  .audit-list { list-style: none; padding: 0; margin: 22px 0 0; font-family: var(--font-mono); font-size: 12px; }
+  .audit-list li {
+    display: grid; grid-template-columns: 84px 96px 1fr;
+    gap: 14px; padding: 9px 0;
+    border-bottom: 1px dashed var(--paper-3);
+    color: #1f2937;
+  }
+  .audit-list li:last-child { border: none; }
+  .audit-list .when { color: #6b7280; }
+  .audit-list .who  { color: #15171b; font-weight: 600; }
+
+  /* ── Pricing ── */
+  .price-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
+  .price {
+    border: 1px solid var(--line); border-radius: var(--r-3);
+    background: var(--bg-2); padding: 32px;
+    display: flex; flex-direction: column;
+  }
+  .price.featured { border-color: var(--signal); background: var(--bg-3); }
+  .price .tier { font-family: var(--font-mono); font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-3); }
+  .price.featured .tier { color: var(--signal); }
+  .price .amt { font-family: var(--font-mono); font-size: 44px; font-weight: 600; letter-spacing: -.02em; margin: 14px 0 4px; }
+  .price .amt .currency { font-size: 18px; color: var(--ink-3); margin-right: 4px; }
+  .price .per { font-family: var(--font-mono); font-size: 12px; color: var(--ink-3); margin-bottom: 24px; }
+  .price ul { list-style: none; padding: 0; margin: 0 0 28px; flex: 1; }
+  .price ul li { padding: 9px 0; font-size: 14px; color: var(--ink-2); border-bottom: 1px dashed var(--line); display: flex; gap: 10px; align-items: flex-start; }
+  .price ul li:last-child { border: none; }
+  .price ul li .check { color: var(--signal); flex-shrink: 0; margin-top: 4px; }
+  .price ul li .x { color: var(--ink-4); flex-shrink: 0; margin-top: 4px; }
+  .price ul li.muted { color: var(--ink-4); }
+
+  /* ── FAQ ── */
+  .faq-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 64px; }
+  details {
+    border-bottom: 1px solid var(--line);
+    padding: 22px 0;
+  }
+  details summary {
+    cursor: pointer;
+    list-style: none;
+    font-family: var(--font-sans); font-size: 16px; font-weight: 500;
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  details summary::-webkit-details-marker { display: none; }
+  details summary::after { content: "+"; font-family: var(--font-mono); color: var(--ink-3); font-size: 20px; }
+  details[open] summary::after { content: "−"; color: var(--signal); }
+  details p { color: var(--ink-2); font-size: 14px; line-height: 1.6; margin: 14px 0 0; }
+
+  /* ── CTA strip ── */
+  .cta-strip {
+    padding: 110px 0;
+    text-align: center;
+  }
+  .cta-strip h2 {
+    font-family: var(--font-mono); font-size: 56px; font-weight: 600;
+    letter-spacing: -.02em; margin: 0 0 24px;
+    text-wrap: balance;
+  }
+  .cta-strip p { color: var(--ink-2); font-size: 18px; margin: 0 0 36px; }
+
+  /* ── Footer ── */
+  footer.bot {
+    border-top: 1px solid var(--line);
+    padding: 56px 0 40px;
+    display: grid; grid-template-columns: 1.4fr 1fr 1fr 1fr;
+    gap: 48px;
+    font-size: 13px;
+  }
+  footer.bot h5 { margin: 0 0 14px; font-size: 11px; color: var(--ink-3); font-family: var(--font-mono); letter-spacing: .14em; text-transform: uppercase; font-weight: 500; }
+  footer.bot a { color: var(--ink-2); text-decoration: none; display: block; padding: 5px 0; }
+  footer.bot a:hover { color: var(--ink); }
+  footer.bot .legal {
+    grid-column: 1 / -1; padding-top: 32px; margin-top: 16px;
+    border-top: 1px solid var(--line);
+    color: var(--ink-3); font-family: var(--font-mono); font-size: 11px;
+    display: flex; justify-content: space-between; gap: 24px;
+  }
+</style>
+</head>
+<body>
+
+<div class="page">
+
+  <!-- ── NAV ── -->
+  <nav class="top">
+    <div class="left">
+      <a href="landing.html" class="brand">
+        <svg viewBox="0 0 28 28" class="vagg-mark"><circle class="node" cx="4" cy="4" r="2"/><circle class="node" cx="24" cy="4" r="2"/><circle class="node" cx="4" cy="24" r="2"/><circle class="node" cx="24" cy="24" r="2"/><path class="wire" d="M4 4 L14 14"/><path class="wire" d="M24 4 L14 14"/><path class="wire" d="M4 24 L14 14"/><path class="wire" d="M24 24 L14 14"/><rect class="core" x="10" y="10" width="8" height="8" rx="1.6"/></svg>
+        <span class="vagg-wordmark">vagg<span class="dot">.</span></span>
+      </a>
+      <div class="links">
+        <a href="#como">Como funciona</a>
+        <a href="#produto">Produto</a>
+        <a href="#transparencia">Transparência</a>
+        <a href="#precos">Preços</a>
+        <a href="#docs">Docs</a>
+      </div>
+    </div>
+    <div class="right">
+      <a href="portal.html" class="btn btn-quiet">Entrar</a>
+      <a href="portal.html" class="btn btn-primary">Solicitar acesso</a>
+    </div>
+  </nav>
+
+  <!-- ── HERO ── -->
+  <section class="hero">
+    <div>
+      <span class="pill ok">disponível para consultorias B2B</span>
+      <h1>Uma VPN. <span class="accent">Todos</span> os clientes da sua consultoria.</h1>
+      <p class="sub">VAGG é o agregador de túneis VPN para consultorias que vivem entre a rede de cinco clientes ao mesmo tempo. O consultor conecta na VPN da empresa — e simplesmente vê o ambiente do cliente certo, com o escopo certo, com auditoria de quem acessou o quê.</p>
+      <div class="cta-row">
+        <a href="portal.html" class="btn btn-primary">Começar trial de 14 dias</a>
+        <a href="#como" class="btn btn-ghost">Ver demo de 90s</a>
+        <span class="note">self-hosted · sem cartão</span>
+      </div>
+    </div>
+
+    <div class="diagram">
+      <div class="head"><span></span><span></span><span></span></div>
+      <svg class="topology" viewBox="0 0 480 360" xmlns="http://www.w3.org/2000/svg">
+        <!-- Left side: consultants -->
+        <text x="14" y="22" class="label-mute">CONSULTORES</text>
+        <g>
+          <rect x="14" y="40" width="120" height="36" rx="6" class="node-rect"/>
+          <text x="28" y="62" class="label">joão · sap basis</text>
+          <rect x="14" y="92" width="120" height="36" rx="6" class="node-rect"/>
+          <text x="28" y="114" class="label">maria · mm</text>
+          <rect x="14" y="144" width="120" height="36" rx="6" class="node-rect"/>
+          <text x="28" y="166" class="label">pedro · fi/co</text>
+          <rect x="14" y="196" width="120" height="36" rx="6" class="node-rect"/>
+          <text x="28" y="218" class="label">+ 27 consultores</text>
+        </g>
+
+        <!-- Center: openvpn -->
+        <text x="180" y="22" class="label-mute">OPENVPN CORP.</text>
+        <rect x="170" y="120" width="80" height="80" rx="8" class="node-rect"/>
+        <text x="186" y="150" class="label">openvpn</text>
+        <text x="186" y="166" class="label-mute">+ ldap</text>
+        <text x="186" y="182" class="label-mute">+ mfa</text>
+
+        <!-- Center-right: VAGG -->
+        <text x="290" y="22" class="label-mute">VAGG</text>
+        <rect x="285" y="120" width="80" height="80" rx="8" class="core-rect"/>
+        <text x="298" y="148" class="core-text">aggregator</text>
+        <text x="298" y="166" class="core-text" style="font-weight:400">nat · dns</text>
+        <text x="298" y="182" class="core-text" style="font-weight:400">rbac · audit</text>
+
+        <!-- Right: client networks -->
+        <text x="392" y="22" class="label-mute">CLIENTES</text>
+        <g>
+          <rect x="380" y="40" width="86" height="36" rx="6" class="node-rect"/>
+          <text x="394" y="62" class="label">petróleo</text>
+          <rect x="380" y="92" width="86" height="36" rx="6" class="node-rect"/>
+          <text x="394" y="114" class="label">varejo</text>
+          <rect x="380" y="144" width="86" height="36" rx="6" class="node-rect"/>
+          <text x="394" y="166" class="label">indústria</text>
+          <rect x="380" y="196" width="86" height="36" rx="6" class="node-rect"/>
+          <text x="394" y="218" class="label">banco</text>
+          <rect x="380" y="248" width="86" height="36" rx="6" class="node-rect"/>
+          <text x="394" y="270" class="label">+ 8 redes</text>
+        </g>
+
+        <!-- Wires: consultants -> openvpn -->
+        <path class="wire-live" d="M 134 58  L 170 145"/>
+        <path class="wire-live" d="M 134 110 L 170 155"/>
+        <path class="wire-dim"  d="M 134 162 L 170 165"/>
+        <path class="wire-dim"  d="M 134 214 L 170 175"/>
+
+        <!-- Openvpn -> VAGG -->
+        <path class="wire-live" d="M 250 160 L 285 160"/>
+
+        <!-- VAGG -> clients -->
+        <path class="wire-live" d="M 365 145 L 380 58"/>
+        <path class="wire-live" d="M 365 155 L 380 110"/>
+        <path class="wire-dim"  d="M 365 165 L 380 162"/>
+        <path class="wire-dim"  d="M 365 175 L 380 214"/>
+        <path class="wire-dim"  d="M 365 185 L 380 266"/>
+
+        <!-- Footer caption -->
+        <text x="14" y="338" class="label-mute">10.8.0.0/24    →    aggregator    →    10.200.0.0/16    (nat remap atômico)</text>
+      </svg>
+    </div>
+  </section>
+
+  <!-- ── TRUST BAR ── -->
+  <div class="trust">
+    <span>compatível com</span>
+    <span>openvpn</span>
+    <span>cisco anyconnect</span>
+    <span>fortinet ssl-vpn</span>
+    <span>globalprotect</span>
+    <span>wireguard®</span>
+    <span>ipsec / strongswan</span>
+  </div>
+
+  <!-- ── PROBLEM ── -->
+  <section class="s">
+    <div class="hgroup">
+      <span class="eyebrow">o problema</span>
+      <h2>Sua consultoria está pagando para <span class="accent">cinco VPNs ao mesmo tempo</span> rodarem no notebook do consultor.</h2>
+      <p class="blurb">Cada cliente novo = mais um cliente VPN no notebook, mais uma credencial, mais um MFA, mais um ticket de suporte. E quando alguém sai da empresa, você precisa lembrar de revogar acesso em N lugares diferentes.</p>
+    </div>
+
+    <div class="pain-grid">
+      <div class="pain">
+        <span class="num">PERDA · 01</span>
+        <div class="cost">R$ 30k<span class="unit">/mês</span></div>
+        <h3>Tempo morto entre VPNs</h3>
+        <p>Consultor perde 15 a 30 min por dia desconectando, reconectando, digitando OTP. Uma consultoria com 30 pessoas queima 30k em horas faturáveis todo mês.</p>
+      </div>
+      <div class="pain">
+        <span class="num">PERDA · 02</span>
+        <div class="cost">R$ 10k<span class="unit">/mês</span></div>
+        <h3>Tickets de IT</h3>
+        <p>"O FortiClient não conecta", "perdi o token", "minha rota sumiu". Time de IT vira mesa de ajuda de cliente VPN alheio.</p>
+      </div>
+      <div class="pain">
+        <span class="num">PERDA · 03</span>
+        <div class="cost">incalculável</div>
+        <h3>Risco de auditoria</h3>
+        <p>Quando o auditor do cliente final pedir "quem da consultoria acessou minha rede no Q1?", você responde com print do Fortigate? Boa sorte.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── HOW IT WORKS ── -->
+  <section class="s" id="como">
+    <div class="hgroup">
+      <span class="eyebrow">como funciona</span>
+      <h2>VAGG senta <span class="accent">atrás</span> da OpenVPN que você já tem.</h2>
+      <p class="blurb">Sem trocar nada do que já funciona. O consultor continua usando o cliente OpenVPN da empresa. Os túneis dos clientes vivem no agregador, não no notebook.</p>
+    </div>
+
+    <div class="how">
+      <div class="how-steps">
+        <div class="how-step active" data-step="1">
+          <span class="lbl">PASSO 01</span>
+          <h4>Consultor conecta na OpenVPN da empresa</h4>
+          <p>Sem cliente novo. Sem treinamento. O fluxo de hoje, do jeito que é hoje.</p>
+        </div>
+        <div class="how-step" data-step="2">
+          <span class="lbl">PASSO 02</span>
+          <h4>VAGG identifica o consultor via RADIUS</h4>
+          <p>RBAC central decide quais clientes ele tem permissão de ver. Default-deny.</p>
+        </div>
+        <div class="how-step" data-step="3">
+          <span class="lbl">PASSO 03</span>
+          <h4>DNS amigável aparece automaticamente</h4>
+          <p>prd-sap.petroleo.vpn.consultoria.com.br resolve. NAT atômico cuida de IPs sobrepostos.</p>
+        </div>
+        <div class="how-step" data-step="4">
+          <span class="lbl">PASSO 04</span>
+          <h4>Cada acesso vira um audit event assinado</h4>
+          <p>Hash chain append-only. Pronto pra LGPD, SOX, BACEN. E pro portal do cliente final.</p>
+        </div>
+      </div>
+
+      <div class="terminal">
+        <div class="bar">
+          <div class="lights"><span></span><span></span><span></span></div>
+          <span class="title">consultor@notebook · ~/projetos/petroleo</span>
+        </div>
+        <div class="body" id="term-body">
+<span class="prompt">$</span> <span class="cmd">openvpn-connect corp.consultoria.com.br</span><br/>
+<span class="out">→ autenticando contra ldap.consultoria.com.br…</span><br/>
+<span class="out">→ aguardando 2fa (microsoft authenticator)…</span><br/>
+<span class="ok">✓ conectado · ip atribuído 10.8.0.42</span><br/>
+<span class="out">→ recebendo rotas: 10.200.0.0/16</span><br/>
+<span class="out">→ recebendo dns:   10.200.0.53 (vagg-dns)</span><br/>
+<br/>
+<span class="prompt">$</span> <span class="cmd">ssh basis@prd-sap.petroleo-prd.vpn.consultoria.com.br</span><br/>
+<span class="out">→ resolve via vagg-dns       … 10.200.1.50</span><br/>
+<span class="out">→ vagg.policy_check(joão, petroleo)</span><br/>
+<span class="ok">✓ allowed · scope=petroleo-prd · expira em 27d</span><br/>
+<span class="out">→ vagg.audit.append(event=ssh_open, hash=9f24a1…)</span><br/>
+<span class="out">→ nat 10.200.1.50 → 192.168.1.50 (real)</span><br/>
+<span class="ok">✓ tunnel active · rtt 4.2ms overhead</span><br/>
+<br/>
+<span class="muted">basis@prd-sap-01:~$ _</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── PILLARS ── -->
+  <section class="s" id="produto">
+    <div class="hgroup">
+      <span class="eyebrow">o produto</span>
+      <h2>Três coisas. <span class="accent">Bem feitas.</span></h2>
+      <p class="blurb">Não é zero-trust. Não é mesh VPN. Não é cliente VPN. É a única coisa que o perímetro corporativo da sua consultoria não consegue fazer: gerir credenciais, escopo e auditoria de redes que não são suas.</p>
+    </div>
+
+    <div class="pillars">
+      <div class="pillar">
+        <div class="ico">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M2 10 L10 2 L18 10 L10 18 Z" stroke="currentColor" stroke-width="1.5"/><circle cx="10" cy="10" r="2.5" fill="currentColor"/></svg>
+        </div>
+        <h3>Identidade & escopo</h3>
+        <p>RBAC central por consultor × cliente × ambiente. Default-deny por construção. Revogação atômica em menos de 5 segundos quando alguém é desligado.</p>
+        <ul class="feat-list">
+          <li>policies com expiração automática</li>
+          <li>scope granular por host ou subnet</li>
+          <li>just-in-time access via slack</li>
+          <li>integração com radius/ldap existente</li>
+        </ul>
+      </div>
+
+      <div class="pillar">
+        <div class="ico">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><circle cx="6" cy="10" r="3" stroke="currentColor" stroke-width="1.5"/><circle cx="14" cy="6" r="2" stroke="currentColor" stroke-width="1.5"/><circle cx="14" cy="14" r="2" stroke="currentColor" stroke-width="1.5"/><line x1="9" y1="10" x2="12" y2="6" stroke="currentColor" stroke-width="1.5"/><line x1="9" y1="10" x2="12" y2="14" stroke="currentColor" stroke-width="1.5"/></svg>
+        </div>
+        <h3>Roteamento & NAT</h3>
+        <p>iptables NETMAP atômico para resolver IPs sobrepostos entre clientes. DNS split-horizon com nomes amigáveis. Um único cliente OpenVPN no notebook.</p>
+        <ul class="feat-list">
+          <li>10.200.0.0/16 virtual space</li>
+          <li>até 254 redes de clientes simultâneas</li>
+          <li>coredns com forward por túnel</li>
+          <li>mtu auto-tuning · sem fragmentação</li>
+        </ul>
+      </div>
+
+      <div class="pillar">
+        <div class="ico">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><rect x="3" y="3" width="14" height="14" rx="1.5" stroke="currentColor" stroke-width="1.5"/><line x1="6" y1="7" x2="14" y2="7" stroke="currentColor" stroke-width="1.5"/><line x1="6" y1="10" x2="14" y2="10" stroke="currentColor" stroke-width="1.5"/><line x1="6" y1="13" x2="11" y2="13" stroke="currentColor" stroke-width="1.5"/></svg>
+        </div>
+        <h3>Auditoria & transparência</h3>
+        <p>Hash chain append-only. Cada conexão, cada acesso, cada mudança de policy. Exportável em CSV/JSON ou consumível via portal read-only para o seu cliente final.</p>
+        <ul class="feat-list">
+          <li>imutável · cryptographically signed</li>
+          <li>retenção configurável (mín. 6 meses)</li>
+          <li>shipping para siem via vector</li>
+          <li>portal de transparência incluído</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── TRANSPARENCY PORTAL TEASER ── -->
+  <section class="s" id="transparencia">
+    <div class="audit-block">
+      <div>
+        <span class="eyebrow">o diferencial</span>
+        <h2 style="margin-top:12px">O portal que faz seu cliente final <span class="accent">renovar contrato.</span></h2>
+        <p class="blurb">Quando o auditor da Petrobras pergunta "quem da consultoria acessou minha rede?", você dá um link. Read-only. Em tempo real. Cryptographically signed. Switching cost que vira renovação automática.</p>
+        <div style="margin-top: 32px; display: flex; gap: 12px;">
+          <a href="portal.html" class="btn btn-primary">Ver portal demo</a>
+          <a href="#precos" class="btn btn-ghost">Incluso no Professional+</a>
+        </div>
+      </div>
+
+      <div class="audit-mock">
+        <div class="head">
+          <div>
+            <div class="t">portal · cliente final</div>
+            <h4>petrobras · acesso da consultoria stefanini</h4>
+            <div class="sub">14 consultores ativos · 4.218 eventos · abril 2026</div>
+          </div>
+          <div class="v">v.audit · 9f24a1c8</div>
+        </div>
+        <ul class="audit-list">
+          <li><span class="when">14:02:08</span><span class="who">joão silva</span><span>ssh open · prd-sap-01 · scope=petroleo-prd</span></li>
+          <li><span class="when">14:01:55</span><span class="who">joão silva</span><span>tunnel up · policy ok · ttl 27d</span></li>
+          <li><span class="when">13:58:12</span><span class="who">maria costa</span><span>http get · sap-portal.petroleo</span></li>
+          <li><span class="when">13:47:00</span><span class="who">admin</span><span>policy revoked · ex-funcionário · pedro a.</span></li>
+          <li><span class="when">13:42:18</span><span class="who">maria costa</span><span>ssh open · qas-sap-02</span></li>
+          <li><span class="when">13:30:41</span><span class="who">joão silva</span><span>tunnel up · policy ok · ttl 27d</span></li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── PRICING ── -->
+  <section class="s" id="precos">
+    <div class="hgroup">
+      <span class="eyebrow">preços</span>
+      <h2>Cobramos por <span class="accent">cliente final ativo</span>. Não por consultor.</h2>
+      <p class="blurb">Você adiciona um consultor novo, não muda nada na fatura. Você fecha cliente novo, paga proporcional. Faz mais sentido pro seu modelo.</p>
+    </div>
+
+    <div class="price-grid">
+      <div class="price">
+        <span class="tier">Starter</span>
+        <div class="amt"><span class="currency">R$</span>1.490</div>
+        <div class="per">/mês · até 5 clientes finais · consultores ilimitados</div>
+        <ul>
+          <li><span class="check">✓</span><span>Aggregator self-hosted</span></li>
+          <li><span class="check">✓</span><span>RBAC central + SSO via RADIUS</span></li>
+          <li><span class="check">✓</span><span>NAT remap + DNS split-horizon</span></li>
+          <li><span class="check">✓</span><span>Audit log com retenção 6 meses</span></li>
+          <li class="muted"><span class="x">—</span><span>Portal de transparência</span></li>
+          <li class="muted"><span class="x">—</span><span>SIEM shipping</span></li>
+        </ul>
+        <a href="portal.html" class="btn btn-ghost" style="justify-content:center">Começar trial</a>
+      </div>
+
+      <div class="price featured">
+        <span class="tier">Professional · mais escolhido</span>
+        <div class="amt"><span class="currency">R$</span>3.990</div>
+        <div class="per">/mês · até 20 clientes finais · consultores ilimitados</div>
+        <ul>
+          <li><span class="check">✓</span><span>Tudo do Starter</span></li>
+          <li><span class="check">✓</span><span><strong>Portal de transparência</strong> para cliente final</span></li>
+          <li><span class="check">✓</span><span>SIEM shipping (Vector)</span></li>
+          <li><span class="check">✓</span><span>Just-in-time access via Slack</span></li>
+          <li><span class="check">✓</span><span>Retenção configurável até 5 anos</span></li>
+          <li><span class="check">✓</span><span>Suporte 8×5 com SLA 4h</span></li>
+        </ul>
+        <a href="portal.html" class="btn btn-primary" style="justify-content:center">Começar trial</a>
+      </div>
+
+      <div class="price">
+        <span class="tier">Enterprise</span>
+        <div class="amt" style="font-size:32px">sob consulta</div>
+        <div class="per">+50 clientes finais · multi-instance · appliance</div>
+        <ul>
+          <li><span class="check">✓</span><span>Tudo do Professional</span></li>
+          <li><span class="check">✓</span><span>Appliance ThinkCentre pré-instalado</span></li>
+          <li><span class="check">✓</span><span>Multi-instance HA</span></li>
+          <li><span class="check">✓</span><span>DPA customizado · ANPD</span></li>
+          <li><span class="check">✓</span><span>Suporte 24×7 · SLA 1h</span></li>
+          <li><span class="check">✓</span><span>Onboarding dedicado</span></li>
+        </ul>
+        <a href="portal.html" class="btn btn-ghost" style="justify-content:center">Falar com vendas</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── FAQ ── -->
+  <section class="s" id="docs">
+    <div class="hgroup">
+      <span class="eyebrow">perguntas francas</span>
+      <h2>O que <span class="accent">não</span> dá pra fingir.</h2>
+    </div>
+
+    <div class="faq-grid">
+      <div>
+        <details open>
+          <summary>VAGG substitui minha OpenVPN corporativa?</summary>
+          <p>Não. E essa é uma decisão de design. Nós sentamos atrás dela. Sua OpenVPN continua sendo o ponto de autenticação primária com sua LDAP, seu MFA, suas políticas de empresa. VAGG só agrega os túneis dos clientes.</p>
+        </details>
+        <details>
+          <summary>Funciona com Tailscale / NetBird / Twingate?</summary>
+          <p>Não, e propositalmente. Esses produtos resolvem outro problema: dar acesso a recursos seus, não consumir VPNs de terceiros. VAGG é a única ferramenta no mercado focada em consumir credenciais VPN de clientes que não são seus.</p>
+        </details>
+        <details>
+          <summary>Os dados do meu cliente final saem da minha rede?</summary>
+          <p>Nunca. VAGG é self-hosted. Roda na sua VM, no seu datacenter ou na sua cloud privada. O único tráfego para fora é a validação diária da licença (sem dados de cliente).</p>
+        </details>
+        <details>
+          <summary>Como funciona quando IPs de dois clientes se sobrepõem?</summary>
+          <p>Caso comum. Cada cliente recebe um /24 dentro de 10.200.0.0/16 (range virtual). NAT atômico via iptables NETMAP traduz na borda. O consultor só vê o IP virtual; o tráfego sai pelo túnel certo.</p>
+        </details>
+      </div>
+
+      <div>
+        <details>
+          <summary>Que protocolos de VPN são suportados?</summary>
+          <p>OpenVPN, Cisco AnyConnect (via openconnect), Fortinet SSL VPN (via openfortivpn), Palo Alto GlobalProtect, IPsec/IKEv2 (via strongSwan) e WireGuard®. Cada cliente roda em container isolado.</p>
+        </details>
+        <details>
+          <summary>Que hardware preciso?</summary>
+          <p>Mínimo: 2 cores x86_64 com AES-NI, 4 GB RAM, 30 GB SSD. Recomendado: 4 cores, 8 GB, 128 GB. Tudo cabe num Lenovo ThinkCentre M93p Tiny — que oferecemos como appliance Enterprise.</p>
+        </details>
+        <details>
+          <summary>E o portal do cliente final, como ele acessa?</summary>
+          <p>Subdomínio dedicado (transparency.suaconsultoria.com.br), HTTPS público, magic link por email + TOTP opcional. Read-only por construção. Cliente final só vê o dele.</p>
+        </details>
+        <details>
+          <summary>LGPD, SOX, BACEN 4.658?</summary>
+          <p>Sim. Audit log atende Marco Civil Art. 13-15 e LGPD Art. 37. Retenção configurável. Hash chain assinada cobre exigências SOX 404 e BACEN 4.658. DPA disponível no Professional+.</p>
+        </details>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── FINAL CTA ── -->
+  <div class="cta-strip">
+    <h2>Uma VPN. Todos os clientes.<br/><span style="color:var(--ink-3)">Quatorze dias. Sem cartão.</span></h2>
+    <p>Trial completo do Professional. Setup em 40 minutos com seu time de IT.</p>
+    <div style="display:flex; gap:12px; justify-content:center">
+      <a href="portal.html" class="btn btn-primary">Iniciar trial</a>
+      <a href="#" class="btn btn-ghost">Marcar demo guiada</a>
+    </div>
+  </div>
+
+  <!-- ── FOOTER ── -->
+  <footer class="bot">
+    <div>
+      <div style="display:flex; align-items:center; gap:10px; margin-bottom:14px;">
+        <svg viewBox="0 0 28 28" class="vagg-mark"><circle class="node" cx="4" cy="4" r="2"/><circle class="node" cx="24" cy="4" r="2"/><circle class="node" cx="4" cy="24" r="2"/><circle class="node" cx="24" cy="24" r="2"/><path class="wire" d="M4 4 L14 14"/><path class="wire" d="M24 4 L14 14"/><path class="wire" d="M4 24 L14 14"/><path class="wire" d="M24 24 L14 14"/><rect class="core" x="10" y="10" width="8" height="8" rx="1.6"/></svg>
+        <span class="vagg-wordmark">vagg<span class="dot">.</span></span>
+      </div>
+      <p style="color:var(--ink-3); font-size:13px; line-height:1.6; max-width:280px;">VPN aggregator self-hosted para consultorias B2B. Made in São Paulo · Apache 2.0 · CNPJ 60.412.881/0001-22</p>
+    </div>
+    <div>
+      <h5>Produto</h5>
+      <a href="#como">Como funciona</a>
+      <a href="#produto">Capacidades</a>
+      <a href="#precos">Preços</a>
+      <a href="portal.html">Portal demo</a>
+    </div>
+    <div>
+      <h5>Recursos</h5>
+      <a href="#">Documentação</a>
+      <a href="#">Guia de instalação</a>
+      <a href="#">Status</a>
+      <a href="#">Changelog</a>
+    </div>
+    <div>
+      <h5>Empresa</h5>
+      <a href="#">Sobre</a>
+      <a href="#">Segurança</a>
+      <a href="#">DPA · LGPD</a>
+      <a href="#">Contato</a>
+    </div>
+
+    <div class="legal">
+      <span>© 2026 vagg networks ltda · todos os direitos reservados</span>
+      <span>"openvpn", "wireguard®", "anyconnect", "globalprotect" são marcas de seus respectivos donos. compatibilidade declarada.</span>
+    </div>
+  </footer>
+
+</div>
+
+<script>
+  // Cycle the "how it works" steps + change terminal narration
+  const steps = document.querySelectorAll('.how-step');
+  let idx = 0;
+  setInterval(() => {
+    steps.forEach(s => s.classList.remove('active'));
+    idx = (idx + 1) % steps.length;
+    steps[idx].classList.add('active');
+  }, 4200);
+  steps.forEach((s, i) => s.addEventListener('click', () => {
+    steps.forEach(x => x.classList.remove('active'));
+    s.classList.add('active');
+    idx = i;
+  }));
+</script>
+
+</body>
+</html>

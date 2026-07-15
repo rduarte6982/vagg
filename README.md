@@ -6,6 +6,7 @@ A consultoria instala o **Aggregator Gateway** na própria infraestrutura, atrá
 
 ## Documentação
 
+- [Como testar localmente](TESTING.md) — três caminhos: demo só-front, stack Docker, modo híbrido
 - [Especificação técnica completa](docs/SPEC.md) — fonte única da verdade
 - [Guia de kickoff](docs/KICKOFF.md) — como começar o desenvolvimento
 - [Contribuição](docs/CONTRIBUTING.md) — padrões e fluxo de PR

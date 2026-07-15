@@ -1,0 +1,427 @@
+/*
+ * VAGG Portal — Design tokens espelhados do brand book (Brand/brand.css).
+ * Dark by default, single accent (signal-green). CSS puro, sem framework.
+ */
+
+:root {
+  /* ── VAGG palette ── */
+  --vagg-bg: #0b0d10;
+  --vagg-bg-2: #111418;
+  --vagg-bg-3: #161a1f;
+  --vagg-line: #21262d;
+  --vagg-line-2: #2c333b;
+  --vagg-ink: #e8eaed;
+  --vagg-ink-2: #b6bbc2;
+  --vagg-ink-3: #7a808a;
+  --vagg-ink-4: #4a505a;
+  --vagg-signal: oklch(78% 0.16 162);
+  --vagg-signal-2: oklch(68% 0.16 162);
+  --vagg-signal-ink: oklch(28% 0.06 162);
+  --vagg-warn: oklch(78% 0.14 75);
+  --vagg-crit: oklch(70% 0.18 25);
+
+  /* legado mapeado pra paleta nova */
+  --primary: var(--vagg-signal);
+  --primary-hover: var(--vagg-signal-2);
+  --primary-soft: rgba(52, 200, 150, 0.1);
+
+  --bg: var(--vagg-bg);
+  --surface: var(--vagg-bg-2);
+  --surface-alt: var(--vagg-bg-3);
+  --header-bg: var(--vagg-bg);
+  --header-text: var(--vagg-ink);
+  --header-muted: var(--vagg-ink-3);
+
+  --border: var(--vagg-line);
+  --border-strong: var(--vagg-line-2);
+
+  --text: var(--vagg-ink);
+  --text-secondary: var(--vagg-ink-2);
+  --text-muted: var(--vagg-ink-3);
+
+  --success: var(--vagg-signal);
+  --warning: var(--vagg-warn);
+  --danger: var(--vagg-crit);
+  --info: var(--vagg-signal);
+
+  --radius: 8px;
+  --radius-lg: 14px;
+
+  --shadow-card: 0 1px 0 rgba(255, 255, 255, 0.04) inset,
+    0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-pop: 0 24px 60px -20px rgba(0, 0, 0, 0.55), 0 2px 8px rgba(0, 0, 0, 0.25);
+
+  --font-family: 'Inter', 'Helvetica Neue', Arial, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  color-scheme: dark;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-family);
+  font-size: 14px;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+a {
+  color: var(--primary);
+  text-decoration: none;
+}
+a:hover {
+  text-decoration: underline;
+}
+
+.mono {
+  font-family: var(--font-mono);
+}
+
+.eyebrow {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.vagg-wordmark {
+  font-family: var(--font-mono);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--text);
+}
+.vagg-wordmark .dot {
+  color: var(--vagg-signal);
+}
+
+/* ---------- Shell ---------- */
+
+.app-shell {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.app-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 24px;
+  height: 56px;
+  background: var(--header-bg);
+  color: var(--header-text);
+  border-bottom: 1px solid var(--border);
+}
+
+.app-header__brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.app-header__brand-mark {
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+}
+
+.app-header__brand-name {
+  font-family: var(--font-mono);
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: 0.02em;
+}
+
+.app-header__brand-sub {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--header-muted);
+  margin-top: 3px;
+}
+
+.app-header__meta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 12px;
+  color: var(--header-muted);
+}
+
+.app-main {
+  flex: 1;
+  padding: 32px 16px;
+}
+
+.container {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 0 8px;
+}
+
+/* ---------- Card ---------- */
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
+  margin-bottom: 16px;
+  overflow: hidden;
+}
+
+.card__header {
+  padding: 18px 20px 14px;
+  border-bottom: 1px solid var(--border);
+}
+
+.card__header h1,
+.card__header h2 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.card__header .muted {
+  margin-top: 4px;
+  font-size: 12px;
+}
+
+.card__body {
+  padding: 18px 20px 20px;
+}
+
+/* ---------- Form ---------- */
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 14px;
+}
+
+.field label {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+input[type='email'],
+input[type='text'],
+input[type='password'],
+input[type='number'],
+input:not([type]) {
+  font: inherit;
+  border: 1px solid var(--border-strong);
+  background: var(--surface-alt);
+  color: var(--text);
+  border-radius: var(--radius);
+  padding: 9px 12px;
+  width: 100%;
+  transition:
+    border-color 0.12s ease,
+    box-shadow 0.12s ease;
+}
+
+input::placeholder {
+  color: var(--vagg-ink-4);
+}
+
+input:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(52, 200, 150, 0.2);
+}
+
+button {
+  font: inherit;
+  font-weight: 500;
+  border-radius: var(--radius);
+  border: 1px solid transparent;
+  background: var(--primary);
+  color: var(--vagg-signal-ink);
+  padding: 9px 16px;
+  cursor: pointer;
+  transition: background 0.12s ease;
+}
+
+button:hover {
+  background: var(--primary-hover);
+}
+
+button:disabled {
+  background: var(--border-strong);
+  color: var(--text-muted);
+  cursor: not-allowed;
+}
+
+button.secondary {
+  background: transparent;
+  border-color: var(--border-strong);
+  color: var(--text);
+}
+
+button.secondary:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+  background: var(--primary-soft);
+}
+
+.muted {
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.err {
+  color: var(--danger);
+  font-size: 12px;
+  background: rgba(231, 92, 70, 0.08);
+  border: 1px solid rgba(231, 92, 70, 0.3);
+  border-radius: var(--radius);
+  padding: 8px 12px;
+  margin: 12px 0;
+}
+
+/* ---------- Table ---------- */
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+thead th {
+  text-align: left;
+  background: var(--surface-alt);
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+tbody td {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+tbody tr:last-child td {
+  border-bottom: none;
+}
+
+tbody tr:hover td {
+  background: rgba(52, 200, 150, 0.04);
+}
+
+/* ---------- Bits ---------- */
+
+.led {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--success);
+  box-shadow: 0 0 0 2px rgba(11, 13, 16, 0.6), 0 0 8px var(--success);
+  margin-right: 6px;
+}
+.led--warn {
+  background: var(--warning);
+  box-shadow: 0 0 0 2px rgba(11, 13, 16, 0.6);
+}
+.led--off {
+  background: var(--vagg-ink-4);
+  box-shadow: 0 0 0 2px rgba(11, 13, 16, 0.6);
+}
+.led--error {
+  background: var(--danger);
+  box-shadow: 0 0 0 2px rgba(11, 13, 16, 0.6), 0 0 8px var(--danger);
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 10px;
+  border-radius: 999px;
+  background: var(--surface-alt);
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.stack > * + * {
+  margin-top: 8px;
+}
+
+.stat-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+}
+
+.stat {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  background: var(--surface-alt);
+}
+
+.stat__label {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+.stat__value {
+  font-size: 26px;
+  font-weight: 600;
+  color: var(--text);
+  line-height: 1.1;
+  margin-top: 6px;
+}
+
+.brand-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: var(--radius-lg);
+  padding: 22px 24px;
+  margin-bottom: 16px;
+}
+
+.brand-card h1 {
+  margin: 0 0 6px;
+  font-family: var(--font-mono);
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.brand-card p {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 1.55;
+}

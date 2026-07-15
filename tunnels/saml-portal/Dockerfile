@@ -28,16 +28,27 @@ RUN mkdir -p /share && chmod 777 /share
 RUN mkdir -p /opt/vagg-mitm /var/log/vagg-mitm && \
     chown -R 1000:1000 /opt/vagg-mitm /var/log/vagg-mitm
 
+# Python3 — usado pelo saml_callback.py (server local 127.0.0.1:8020 que
+# implementa o redirect openfortivpn-style pra bypass de hostcheck FortiGate)
+RUN apk add --no-cache python3 \
+    && rm -rf /var/cache/apk/*
+
 # Cookie addon do mitmproxy
 COPY --chmod=0644 saml-portal/cookie_addon.py /usr/local/share/cookie_addon.py
 
+# Callback HTTP server local — bypass de hostcheck FortiGate (openfortivpn-style)
+COPY --chmod=0755 saml-portal/saml_callback.py /usr/local/share/saml_callback.py
+
 # /etc/cont-init.d/ é extension point oficial do jlesage — scripts aqui
 # rodam UMA VEZ antes dos serviços (Firefox/X11/nginx) subirem. Ideal pra
-# iniciar mitmproxy como daemon background.
+# iniciar mitmproxy + callback server como daemons background.
 COPY --chmod=0755 saml-portal/cont-init-mitm.sh /etc/cont-init.d/90-vagg-mitm.sh
 
 # Confia no CA do mitmproxy via certutil dentro do profile do Firefox
 COPY --chmod=0755 saml-portal/firefox-init.sh /etc/cont-init.d/91-firefox-mitm.sh
+
+# Callback server pra bypass do hostcheck FortiGate (modo forti only)
+COPY --chmod=0755 saml-portal/cont-init-callback.sh /etc/cont-init.d/92-vagg-callback.sh
 
 ENV VAGG_SAML_GATEWAY_URL="" \
     VAGG_SAML_COOKIE_OUT="/share/cookie" \

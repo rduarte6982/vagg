@@ -1,0 +1,331 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8"/>
+<title>VAGG · Pitch comercial</title>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap"/>
+<link rel="stylesheet" href="brand.css"/>
+<script src="deck-stage.js"></script>
+<style>
+  :root { --slide-w: 1920px; --slide-h: 1080px; }
+  body { background: #050608; }
+  deck-stage > section {
+    width: var(--slide-w); height: var(--slide-h);
+    background: var(--bg);
+    color: var(--ink);
+    padding: 96px 120px;
+    display: flex; flex-direction: column;
+    position: relative;
+    overflow: hidden;
+    font-family: var(--font-sans);
+  }
+  /* slide chrome */
+  .slide-num { position: absolute; bottom: 48px; left: 120px; font-family: var(--font-mono); font-size: 18px; color: var(--ink-4); letter-spacing: .2em; }
+  .slide-brand { position: absolute; top: 48px; right: 120px; display: flex; gap: 14px; align-items: center; }
+  .slide-brand .vagg-mark { width: 32px; height: 32px; }
+  .slide-brand .vagg-wordmark { font-size: 22px; }
+  .eb { font-family: var(--font-mono); font-size: 22px; letter-spacing: .18em; color: var(--ink-3); text-transform: uppercase; }
+  h1.bigtitle { font-family: var(--font-mono); font-weight: 600; font-size: 140px; line-height: 1.0; letter-spacing: -.02em; margin: 32px 0 0; text-wrap: balance; }
+  h2.title    { font-family: var(--font-mono); font-weight: 600; font-size: 96px; line-height: 1.05; letter-spacing: -.02em; margin: 24px 0 0; text-wrap: balance; }
+  h2 .ac { color: var(--signal); }
+  p.lead { font-size: 36px; line-height: 1.5; color: var(--ink-2); max-width: 1300px; margin-top: 40px; text-wrap: pretty; }
+
+  /* cover */
+  .cover { justify-content: space-between; }
+  .cover .bigmark svg { width: 200px; height: 200px; }
+  .cover footer { display: flex; justify-content: space-between; align-items: flex-end; }
+  .cover footer .meta { font-family: var(--font-mono); font-size: 22px; color: var(--ink-3); letter-spacing: .14em; text-transform: uppercase; }
+
+  /* metric slide */
+  .metric-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 32px; margin-top: 80px; }
+  .metric { padding: 56px 48px; border: 1px solid var(--line); border-radius: 22px; background: var(--bg-2); }
+  .metric .num { font-family: var(--font-mono); font-size: 96px; font-weight: 600; letter-spacing: -.02em; }
+  .metric .num .u { font-size: 32px; color: var(--ink-3); margin-left: 8px; }
+  .metric .lb { font-size: 22px; color: var(--ink-2); line-height: 1.4; margin-top: 16px; }
+  .metric.signal .num { color: var(--signal); }
+
+  /* split */
+  .split { display: grid; grid-template-columns: 1fr 1fr; gap: 80px; margin-top: 64px; }
+  .split .col h3 { font-family: var(--font-mono); font-size: 32px; font-weight: 600; margin: 0 0 24px; }
+  .split ul { list-style: none; padding: 0; margin: 0; }
+  .split li { padding: 18px 0; border-bottom: 1px dashed var(--line); font-size: 26px; color: var(--ink-2); display: flex; gap: 16px; }
+  .split li b { color: var(--ink); font-weight: 500; }
+  .split li::before { font-family: var(--font-mono); color: var(--signal); }
+  .split .yes li::before { content: "✓"; }
+  .split .no li::before  { content: "—"; color: var(--ink-4); }
+
+  /* topology */
+  .topo { margin-top: 64px; }
+
+  /* pricing */
+  .price-deck { display: grid; grid-template-columns: repeat(3,1fr); gap: 28px; margin-top: 64px; }
+  .price-deck .p { padding: 56px 44px; border: 1px solid var(--line); border-radius: 22px; background: var(--bg-2); display: flex; flex-direction: column; min-height: 580px; }
+  .price-deck .p.fea { border-color: var(--signal); background: var(--bg-3); }
+  .price-deck .tier { font-family: var(--font-mono); font-size: 22px; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-3); }
+  .price-deck .fea .tier { color: var(--signal); }
+  .price-deck .am { font-family: var(--font-mono); font-size: 76px; font-weight: 600; letter-spacing: -.02em; margin: 18px 0 8px; }
+  .price-deck .am .c { font-size: 32px; color: var(--ink-3); }
+  .price-deck .pr { font-size: 20px; color: var(--ink-3); margin-bottom: 32px; font-family: var(--font-mono); }
+  .price-deck ul { padding: 0; list-style: none; margin: 0; }
+  .price-deck li { padding: 14px 0; border-bottom: 1px dashed var(--line); font-size: 22px; color: var(--ink-2); }
+  .price-deck li::before { content: "✓ "; color: var(--signal); font-family: var(--font-mono); margin-right: 8px; }
+
+  /* closing */
+  .closing { justify-content: center; align-items: flex-start; }
+  .closing h2 { font-size: 200px; line-height: 0.95; letter-spacing: -.03em; max-width: 1500px; }
+  .closing .footnote { margin-top: 80px; display: flex; gap: 64px; }
+  .closing .footnote div { font-family: var(--font-mono); font-size: 22px; color: var(--ink-3); letter-spacing: .14em; text-transform: uppercase; }
+  .closing .footnote div b { color: var(--signal); display: block; font-size: 28px; letter-spacing: 0; text-transform: none; margin-top: 8px; }
+
+  /* paper slide */
+  .paper-bg { background: var(--paper); color: var(--ink-on-paper); }
+  .paper-bg .eb { color: #6b7280; }
+  .paper-bg p.lead { color: #2c333b; }
+  .paper-bg .slide-brand .vagg-mark .node { fill: var(--ink-on-paper); }
+  .paper-bg .slide-brand .vagg-mark .wire { stroke: #888a82; }
+  .paper-bg .slide-brand .vagg-wordmark { color: var(--ink-on-paper); }
+  .paper-bg .slide-num { color: #b6bbc2; }
+</style>
+</head>
+<body>
+<deck-stage>
+
+<!-- 01 cover -->
+<section data-screen-label="01 Cover" class="cover">
+  <div class="slide-brand">
+    <svg viewBox="0 0 28 28" class="vagg-mark"><circle class="node" cx="4" cy="4" r="2"/><circle class="node" cx="24" cy="4" r="2"/><circle class="node" cx="4" cy="24" r="2"/><circle class="node" cx="24" cy="24" r="2"/><path class="wire" d="M4 4 L14 14"/><path class="wire" d="M24 4 L14 14"/><path class="wire" d="M4 24 L14 14"/><path class="wire" d="M24 24 L14 14"/><rect class="core" x="10" y="10" width="8" height="8" rx="1.6"/></svg>
+    <span class="vagg-wordmark">vagg<span class="dot">.</span></span>
+  </div>
+  <div>
+    <span class="eb">Pitch comercial · v1.2 · maio 2026</span>
+    <h1 class="bigtitle">Uma VPN.<br/><span style="color:var(--signal)">Todos</span> os clientes<br/>da sua consultoria.</h1>
+  </div>
+  <div class="bigmark">
+    <svg viewBox="0 0 28 28" class="vagg-mark"><circle class="node" cx="4" cy="4" r="2"/><circle class="node" cx="24" cy="4" r="2"/><circle class="node" cx="4" cy="24" r="2"/><circle class="node" cx="24" cy="24" r="2"/><path class="wire" d="M4 4 L14 14"/><path class="wire" d="M24 4 L14 14"/><path class="wire" d="M4 24 L14 14"/><path class="wire" d="M24 24 L14 14"/><rect class="core" x="10" y="10" width="8" height="8" rx="1.6"/></svg>
+  </div>
+  <footer>
+    <div class="meta">vagg networks · são paulo · b2b</div>
+    <div class="meta" style="text-align:right">apresentação · stefanini brasil</div>
+  </footer>
+  <span class="slide-num">01</span>
+</section>
+
+<!-- 02 problem -->
+<section data-screen-label="02 Problema">
+  <div class="slide-brand">
+    <svg viewBox="0 0 28 28" class="vagg-mark"><circle class="node" cx="4" cy="4" r="2"/><circle class="node" cx="24" cy="4" r="2"/><circle class="node" cx="4" cy="24" r="2"/><circle class="node" cx="24" cy="24" r="2"/><path class="wire" d="M4 4 L14 14"/><path class="wire" d="M24 4 L14 14"/><path class="wire" d="M4 24 L14 14"/><path class="wire" d="M24 24 L14 14"/><rect class="core" x="10" y="10" width="8" height="8" rx="1.6"/></svg>
+    <span class="vagg-wordmark">vagg<span class="dot">.</span></span>
+  </div>
+  <span class="eb">o problema</span>
+  <h2 class="title">Sua consultoria paga para <span class="ac">cinco VPNs</span><br/>rodarem no notebook do consultor.</h2>
+  <div class="metric-grid">
+    <div class="metric signal"><div class="num">R$ 30k<span class="u">/mês</span></div><div class="lb">Tempo morto entre VPNs · 30 consultores × 20min/dia</div></div>
+    <div class="metric"><div class="num">R$ 10k<span class="u">/mês</span></div><div class="lb">Tickets de IT por cliente VPN alheio que travou</div></div>
+    <div class="metric"><div class="num">N/A</div><div class="lb">Audit trail centralizado quando o auditor pede</div></div>
+  </div>
+  <span class="slide-num">02 / 08</span>
+</section>
+
+<!-- 03 solution -->
+<section data-screen-label="03 Solução">
+  <div class="slide-brand">
+    <svg viewBox="0 0 28 28" class="vagg-mark"><circle class="node" cx="4" cy="4" r="2"/><circle class="node" cx="24" cy="4" r="2"/><circle class="node" cx="4" cy="24" r="2"/><circle class="node" cx="24" cy="24" r="2"/><path class="wire" d="M4 4 L14 14"/><path class="wire" d="M24 4 L14 14"/><path class="wire" d="M4 24 L14 14"/><path class="wire" d="M24 24 L14 14"/><rect class="core" x="10" y="10" width="8" height="8" rx="1.6"/></svg>
+    <span class="vagg-wordmark">vagg<span class="dot">.</span></span>
+  </div>
+  <span class="eb">a solução</span>
+  <h2 class="title">VAGG senta <span class="ac">atrás</span><br/>da OpenVPN que você já tem.</h2>
+  <p class="lead">O consultor conecta na VPN da empresa. As redes dos clientes aparecem com nomes amigáveis, escopo certo, auditoria automática. Sem cliente novo no notebook. Sem treinamento. Sem trocar nada do que já funciona.</p>
+  <div class="topo">
+    <svg viewBox="0 0 1680 380" style="width:100%; height:auto">
+      <text x="0" y="22" fill="#7a808a" font-family="JetBrains Mono" font-size="20" letter-spacing="2">CONSULTORES</text>
+      <text x="500" y="22" fill="#7a808a" font-family="JetBrains Mono" font-size="20" letter-spacing="2">OPENVPN CORP.</text>
+      <text x="950" y="22" fill="#7a808a" font-family="JetBrains Mono" font-size="20" letter-spacing="2">VAGG · AGGREGATOR</text>
+      <text x="1450" y="22" fill="#7a808a" font-family="JetBrains Mono" font-size="20" letter-spacing="2">CLIENTES</text>
+
+      <g fill="#161a1f" stroke="#2c333b">
+        <rect x="0" y="60"  width="240" height="56" rx="10"/>
+        <rect x="0" y="140" width="240" height="56" rx="10"/>
+        <rect x="0" y="220" width="240" height="56" rx="10"/>
+        <rect x="0" y="300" width="240" height="56" rx="10"/>
+      </g>
+      <g fill="#e8eaed" font-family="JetBrains Mono" font-size="22">
+        <text x="20" y="96">joão · sap basis</text>
+        <text x="20" y="176">maria · mm</text>
+        <text x="20" y="256">pedro · fi/co</text>
+        <text x="20" y="336">+ 27 consultores</text>
+      </g>
+
+      <rect x="500" y="160" width="240" height="120" rx="14" fill="#161a1f" stroke="#2c333b"/>
+      <text x="528" y="206" fill="#e8eaed" font-family="JetBrains Mono" font-size="26">openvpn</text>
+      <text x="528" y="240" fill="#7a808a" font-family="JetBrains Mono" font-size="20">ldap · mfa</text>
+
+      <rect x="940" y="160" width="280" height="120" rx="14" fill="oklch(78% 0.16 162)"/>
+      <text x="970" y="206" fill="#103127" font-family="JetBrains Mono" font-size="26" font-weight="600">aggregator</text>
+      <text x="970" y="240" fill="#103127" font-family="JetBrains Mono" font-size="20">nat · dns · rbac · audit</text>
+
+      <g fill="#161a1f" stroke="#2c333b">
+        <rect x="1440" y="60"  width="220" height="56" rx="10"/>
+        <rect x="1440" y="140" width="220" height="56" rx="10"/>
+        <rect x="1440" y="220" width="220" height="56" rx="10"/>
+        <rect x="1440" y="300" width="220" height="56" rx="10"/>
+      </g>
+      <g fill="#e8eaed" font-family="JetBrains Mono" font-size="22">
+        <text x="1462" y="96">petróleo</text>
+        <text x="1462" y="176">varejo</text>
+        <text x="1462" y="256">indústria</text>
+        <text x="1462" y="336">+ 8 redes</text>
+      </g>
+
+      <g stroke="oklch(78% 0.16 162)" stroke-width="2" fill="none" stroke-dasharray="6 6">
+        <path d="M240 88 L500 200"/>
+        <path d="M240 168 L500 220"/>
+        <path d="M740 220 L940 220"/>
+        <path d="M1220 200 L1440 88"/>
+        <path d="M1220 220 L1440 168"/>
+      </g>
+      <g stroke="#2c333b" stroke-width="2" fill="none">
+        <path d="M240 248 L500 240"/>
+        <path d="M240 328 L500 260"/>
+        <path d="M1220 240 L1440 248"/>
+        <path d="M1220 260 L1440 328"/>
+      </g>
+    </svg>
+  </div>
+  <span class="slide-num">03 / 08</span>
+</section>
+
+<!-- 04 differentiator -->
+<section data-screen-label="04 Diferencial" class="paper-bg">
+  <div class="slide-brand">
+    <svg viewBox="0 0 28 28" class="vagg-mark on-paper"><circle class="node" cx="4" cy="4" r="2"/><circle class="node" cx="24" cy="4" r="2"/><circle class="node" cx="4" cy="24" r="2"/><circle class="node" cx="24" cy="24" r="2"/><path class="wire" d="M4 4 L14 14"/><path class="wire" d="M24 4 L14 14"/><path class="wire" d="M4 24 L14 14"/><path class="wire" d="M24 24 L14 14"/><rect class="core" x="10" y="10" width="8" height="8" rx="1.6"/></svg>
+    <span class="vagg-wordmark">vagg<span class="dot">.</span></span>
+  </div>
+  <span class="eb">o diferencial irresistível</span>
+  <h2 class="title" style="color:var(--ink-on-paper)">O portal que faz seu cliente<br/>final <span style="color:oklch(58% 0.14 162)">renovar contrato.</span></h2>
+  <p class="lead">Quando o auditor da Petrobras perguntar "quem da consultoria acessou minha rede no Q1?", você dá um link. Read-only. Em tempo real. Cryptographically signed. Switching cost que vira renovação automática.</p>
+  <div style="display:grid; grid-template-columns: repeat(4,1fr); gap: 24px; margin-top: 80px;">
+    <div style="padding: 32px; background: white; border-radius: 18px;"><div style="font-family:var(--font-mono); font-size:18px; color:#6b7280; letter-spacing:.14em; text-transform:uppercase;">consultores ativos</div><div style="font-family:var(--font-mono); font-size:60px; font-weight:600; margin-top:12px;">14</div></div>
+    <div style="padding: 32px; background: white; border-radius: 18px;"><div style="font-family:var(--font-mono); font-size:18px; color:#6b7280; letter-spacing:.14em; text-transform:uppercase;">eventos · abr</div><div style="font-family:var(--font-mono); font-size:60px; font-weight:600; margin-top:12px;">4.218</div></div>
+    <div style="padding: 32px; background: white; border-radius: 18px;"><div style="font-family:var(--font-mono); font-size:18px; color:#6b7280; letter-spacing:.14em; text-transform:uppercase;">policies expiradas</div><div style="font-family:var(--font-mono); font-size:60px; font-weight:600; margin-top:12px;">0</div></div>
+    <div style="padding: 32px; background: white; border-radius: 18px;"><div style="font-family:var(--font-mono); font-size:18px; color:#6b7280; letter-spacing:.14em; text-transform:uppercase;">hash chain</div><div style="font-family:var(--font-mono); font-size:32px; font-weight:600; margin-top:12px; color: oklch(58% 0.14 162)">9f24a1c8 ✓</div></div>
+  </div>
+  <span class="slide-num" style="color:#b6bbc2">04 / 08</span>
+</section>
+
+<!-- 05 not vs is -->
+<section data-screen-label="05 Não-objetivos">
+  <div class="slide-brand">
+    <svg viewBox="0 0 28 28" class="vagg-mark"><circle class="node" cx="4" cy="4" r="2"/><circle class="node" cx="24" cy="4" r="2"/><circle class="node" cx="4" cy="24" r="2"/><circle class="node" cx="24" cy="24" r="2"/><path class="wire" d="M4 4 L14 14"/><path class="wire" d="M24 4 L14 14"/><path class="wire" d="M4 24 L14 14"/><path class="wire" d="M24 24 L14 14"/><rect class="core" x="10" y="10" width="8" height="8" rx="1.6"/></svg>
+    <span class="vagg-wordmark">vagg<span class="dot">.</span></span>
+  </div>
+  <span class="eb">o que vagg é · e o que não é</span>
+  <h2 class="title">Três coisas. <span class="ac">Bem feitas.</span></h2>
+  <div class="split">
+    <div class="col">
+      <h3 style="color:var(--signal)">VAGG é</h3>
+      <ul class="yes">
+        <li><b>Identidade & escopo</b> · RBAC central por consultor × cliente, default-deny, revogação atômica em &lt;5s</li>
+        <li><b>Roteamento & NAT</b> · iptables NETMAP atômico para IPs sobrepostos, DNS split-horizon</li>
+        <li><b>Auditoria</b> · hash chain append-only · LGPD, SOX, BACEN 4.658</li>
+        <li><b>Self-hosted</b> · roda na sua infra, atrás da sua OpenVPN</li>
+      </ul>
+    </div>
+    <div class="col">
+      <h3 style="color:var(--ink-3)">VAGG não é</h3>
+      <ul class="no">
+        <li>Substituto da OpenVPN corporativa que você já tem</li>
+        <li>Zero-trust gateway tipo Cloudflare Access ou Tailscale</li>
+        <li>Cliente VPN no notebook do consultor</li>
+        <li>SIEM ou IDS — gera logs, não inspeciona tráfego</li>
+      </ul>
+    </div>
+  </div>
+  <span class="slide-num">05 / 08</span>
+</section>
+
+<!-- 06 market -->
+<section data-screen-label="06 Mercado">
+  <div class="slide-brand">
+    <svg viewBox="0 0 28 28" class="vagg-mark"><circle class="node" cx="4" cy="4" r="2"/><circle class="node" cx="24" cy="4" r="2"/><circle class="node" cx="4" cy="24" r="2"/><circle class="node" cx="24" cy="24" r="2"/><path class="wire" d="M4 4 L14 14"/><path class="wire" d="M24 4 L14 14"/><path class="wire" d="M4 24 L14 14"/><path class="wire" d="M24 24 L14 14"/><rect class="core" x="10" y="10" width="8" height="8" rx="1.6"/></svg>
+    <span class="vagg-wordmark">vagg<span class="dot">.</span></span>
+  </div>
+  <span class="eb">a categoria que ainda não tem nome</span>
+  <h2 class="title">Tailscale resolve um problema.<br/>Pulse Secure resolve outro.<br/><span class="ac">Ninguém resolve o seu.</span></h2>
+  <div class="metric-grid" style="grid-template-columns: repeat(4,1fr); gap: 20px; margin-top: 64px;">
+    <div class="metric"><div class="lb" style="font-family:var(--font-mono); font-size:18px; letter-spacing:.14em; text-transform:uppercase; color:var(--ink-4); margin: 0 0 12px;">Mesh VPN</div><div style="font-family:var(--font-mono); font-size:24px;">Tailscale, NetBird</div><div class="lb" style="margin-top:18px;">Pressupõe que você é dono da rede</div></div>
+    <div class="metric"><div class="lb" style="font-family:var(--font-mono); font-size:18px; letter-spacing:.14em; text-transform:uppercase; color:var(--ink-4); margin: 0 0 12px;">Reverse proxy</div><div style="font-family:var(--font-mono); font-size:24px;">Cloudflare, Twingate</div><div class="lb" style="margin-top:18px;">Direção oposta — expor, não consumir</div></div>
+    <div class="metric"><div class="lb" style="font-family:var(--font-mono); font-size:18px; letter-spacing:.14em; text-transform:uppercase; color:var(--ink-4); margin: 0 0 12px;">VPN concentrator</div><div style="font-family:var(--font-mono); font-size:24px;">Pulse, Palo Alto</div><div class="lb" style="margin-top:18px;">Single-tenant, termina na sua rede</div></div>
+    <div class="metric signal" style="border-color:var(--signal)"><div class="lb" style="font-family:var(--font-mono); font-size:18px; letter-spacing:.14em; text-transform:uppercase; color:var(--signal); margin: 0 0 12px;">Vpn aggregator</div><div style="font-family:var(--font-mono); font-size:24px; color:var(--signal)">VAGG</div><div class="lb" style="margin-top:18px;">Consumir VPNs de N clientes · multi-tenant · audit</div></div>
+  </div>
+  <p class="lead" style="font-size: 28px; margin-top: 64px;"><span class="mono" style="color:var(--signal)">TAM realista</span> · 500–2.000 consultorias B2B no Brasil com 20+ consultores e 5+ clientes simultâneos.</p>
+  <span class="slide-num">06 / 08</span>
+</section>
+
+<!-- 07 pricing -->
+<section data-screen-label="07 Preços">
+  <div class="slide-brand">
+    <svg viewBox="0 0 28 28" class="vagg-mark"><circle class="node" cx="4" cy="4" r="2"/><circle class="node" cx="24" cy="4" r="2"/><circle class="node" cx="4" cy="24" r="2"/><circle class="node" cx="24" cy="24" r="2"/><path class="wire" d="M4 4 L14 14"/><path class="wire" d="M24 4 L14 14"/><path class="wire" d="M4 24 L14 14"/><path class="wire" d="M24 24 L14 14"/><rect class="core" x="10" y="10" width="8" height="8" rx="1.6"/></svg>
+    <span class="vagg-wordmark">vagg<span class="dot">.</span></span>
+  </div>
+  <span class="eb">preços</span>
+  <h2 class="title">Cobramos por <span class="ac">cliente final ativo</span>.<br/>Não por consultor.</h2>
+  <div class="price-deck">
+    <div class="p">
+      <div class="tier">Starter</div>
+      <div class="am"><span class="c">R$</span>1.490</div>
+      <div class="pr">/mês · até 5 clientes finais</div>
+      <ul>
+        <li>Aggregator self-hosted</li>
+        <li>RBAC + SSO RADIUS</li>
+        <li>NAT + DNS split-horizon</li>
+        <li>Audit · 6 meses</li>
+      </ul>
+    </div>
+    <div class="p fea">
+      <div class="tier">Professional · mais escolhido</div>
+      <div class="am"><span class="c">R$</span>3.990</div>
+      <div class="pr">/mês · até 20 clientes finais</div>
+      <ul>
+        <li>Tudo do Starter</li>
+        <li><b>Portal de transparência</b></li>
+        <li>SIEM shipping · Vector</li>
+        <li>JIT access via Slack</li>
+        <li>Suporte 8×5 · SLA 4h</li>
+      </ul>
+    </div>
+    <div class="p">
+      <div class="tier">Enterprise</div>
+      <div class="am" style="font-size:48px">sob consulta</div>
+      <div class="pr">+50 clientes · multi-instance</div>
+      <ul>
+        <li>Tudo do Professional</li>
+        <li>Appliance ThinkCentre</li>
+        <li>Multi-instance HA</li>
+        <li>DPA customizado</li>
+        <li>24×7 · SLA 1h</li>
+      </ul>
+    </div>
+  </div>
+  <span class="slide-num">07 / 08</span>
+</section>
+
+<!-- 08 close -->
+<section data-screen-label="08 Próximo passo" class="closing">
+  <div class="slide-brand">
+    <svg viewBox="0 0 28 28" class="vagg-mark"><circle class="node" cx="4" cy="4" r="2"/><circle class="node" cx="24" cy="4" r="2"/><circle class="node" cx="4" cy="24" r="2"/><circle class="node" cx="24" cy="24" r="2"/><path class="wire" d="M4 4 L14 14"/><path class="wire" d="M24 4 L14 14"/><path class="wire" d="M4 24 L14 14"/><path class="wire" d="M24 24 L14 14"/><rect class="core" x="10" y="10" width="8" height="8" rx="1.6"/></svg>
+    <span class="vagg-wordmark">vagg<span class="dot">.</span></span>
+  </div>
+  <span class="eb">próximo passo</span>
+  <h2 class="title">Trial de <span class="ac">14 dias</span>.<br/>Setup em 40 minutos<br/>com seu time de IT.</h2>
+  <div class="footnote">
+    <div>contato comercial<b>vendas@vagg.io</b></div>
+    <div>marcar demo<b>vagg.io/demo</b></div>
+    <div>documentação<b>docs.vagg.io</b></div>
+  </div>
+  <span class="slide-num">08 / 08</span>
+</section>
+
+</deck-stage>
+</body>
+</html>

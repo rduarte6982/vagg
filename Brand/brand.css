@@ -1,0 +1,148 @@
+/* VAGG — Design System
+   Brand: a calm, technical infrastructure tool. Neutral cool palette with a single
+   electric accent (signal-green) borrowed from network status LEDs. */
+
+:root {
+  /* ── Color tokens ── */
+  --bg:        #0b0d10;          /* deep ink */
+  --bg-2:      #111418;
+  --bg-3:      #161a1f;
+  --line:      #21262d;
+  --line-2:    #2c333b;
+  --ink:       #e8eaed;
+  --ink-2:     #b6bbc2;
+  --ink-3:     #7a808a;
+  --ink-4:     #4a505a;
+
+  --paper:     #f6f5f1;          /* warm-white for light surfaces */
+  --paper-2:   #ecebe5;
+  --paper-3:   #dedcd3;
+  --ink-on-paper: #15171b;
+
+  --signal:    oklch(78% 0.16 162);  /* signal green — single accent */
+  --signal-2:  oklch(68% 0.16 162);
+  --signal-ink: oklch(28% 0.06 162);
+
+  --warn:      oklch(78% 0.14 75);
+  --crit:      oklch(70% 0.18 25);
+
+  /* ── Type ── */
+  --font-sans: "Inter", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+
+  /* ── Radii / spacing ── */
+  --r-1: 4px;
+  --r-2: 8px;
+  --r-3: 14px;
+  --r-4: 22px;
+
+  --shadow-1: 0 1px 0 rgba(255,255,255,0.04) inset, 0 1px 2px rgba(0,0,0,0.3);
+  --shadow-2: 0 24px 60px -20px rgba(0,0,0,0.55), 0 2px 8px rgba(0,0,0,0.25);
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body {
+  font-family: var(--font-sans);
+  background: var(--bg);
+  color: var(--ink);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+.mono { font-family: var(--font-mono); font-feature-settings: "ss01","cv11"; }
+.kbd  { font-family: var(--font-mono); font-size: 11px; padding: 2px 6px; border-radius: 4px;
+        background: var(--bg-3); border: 1px solid var(--line); color: var(--ink-2); }
+
+/* ── Logo mark ─────────────────────────────────────────────
+   The VAGG mark: four nodes routed through a central aggregator.
+   Reads as "many → one → many". Pure geometric, no gradients.
+*/
+.vagg-mark {
+  display: inline-block;
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+}
+.vagg-mark .node    { fill: var(--ink-2); }
+.vagg-mark .core    { fill: var(--signal); }
+.vagg-mark .wire    { stroke: var(--ink-3); stroke-width: 1.4; fill: none; }
+.vagg-mark.on-paper .node { fill: var(--ink-on-paper); }
+.vagg-mark.on-paper .wire { stroke: #888a82; }
+
+.vagg-wordmark {
+  font-family: var(--font-mono);
+  font-weight: 600;
+  font-size: 18px;
+  letter-spacing: 0.02em;
+  color: var(--ink);
+}
+.vagg-wordmark .dot { color: var(--signal); }
+
+/* ── Buttons ── */
+.btn {
+  display: inline-flex; align-items: center; gap: 8px;
+  font-family: var(--font-sans);
+  font-weight: 500;
+  font-size: 14px;
+  line-height: 1;
+  padding: 11px 16px;
+  border-radius: var(--r-2);
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: background .15s, border-color .15s, color .15s;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.btn-primary {
+  background: var(--signal);
+  color: var(--signal-ink);
+}
+.btn-primary:hover { background: var(--signal-2); }
+.btn-ghost {
+  background: transparent;
+  color: var(--ink);
+  border-color: var(--line-2);
+}
+.btn-ghost:hover { background: var(--bg-2); border-color: var(--ink-3); }
+.btn-quiet {
+  background: transparent;
+  color: var(--ink-2);
+  padding: 8px 10px;
+}
+.btn-quiet:hover { color: var(--ink); }
+
+/* ── Status pill ── */
+.pill {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-family: var(--font-mono); font-size: 11px;
+  padding: 4px 8px; border-radius: 999px;
+  background: var(--bg-2); color: var(--ink-2);
+  border: 1px solid var(--line);
+}
+.pill::before {
+  content: ""; width: 6px; height: 6px; border-radius: 999px;
+  background: var(--ink-3);
+}
+.pill.ok::before   { background: var(--signal); box-shadow: 0 0 8px var(--signal); }
+.pill.warn::before { background: var(--warn); }
+.pill.crit::before { background: var(--crit); }
+
+/* ── Card ── */
+.card {
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r-3);
+}
+
+/* utility */
+.row { display: flex; align-items: center; }
+.col { display: flex; flex-direction: column; }
+.muted { color: var(--ink-3); }
+.eyebrow {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}

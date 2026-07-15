@@ -1,12 +1,14 @@
 {
   "app": {
-    "title": "VPN Aggregator",
-    "subtitle": "Painel administrativo"
+    "title": "vagg.",
+    "subtitle": "console",
+    "tagline": "A VPN que sua consultoria não precisa.",
+    "demo_banner": "Modo demonstração — dados em memória, qualquer login funciona."
   },
   "nav": {
     "dashboard": "Dashboard",
     "clients": "Clientes",
-    "consultants": "Consultores",
+    "consultants": "Usuários",
     "policies": "Políticas",
     "audit": "Auditoria",
     "system": "Sistema",
@@ -16,11 +18,14 @@
     "theme_light": "Tema claro"
   },
   "login": {
-    "email": "E-mail",
+    "title": "Entrar",
+    "email": "Usuário",
     "password": "Senha",
     "submit": "Entrar",
     "submitting": "Entrando...",
-    "error": "Falha de autenticação"
+    "error": "Falha de autenticação",
+    "hint_demo": "Em modo demonstração, qualquer usuário e senha funcionam.",
+    "hint_default": "Padrão de instalação: admin / admin. Você pode trocar a senha depois pela aba Sistema."
   },
   "common": {
     "loading": "Carregando...",
@@ -36,17 +41,26 @@
     "search": "Buscar",
     "export_csv": "Exportar CSV",
     "export_json": "Exportar JSON",
-    "refresh": "Atualizar"
+    "refresh": "Atualizar",
+    "close": "Fechar",
+    "open_demo": "Abrir modo demonstração",
+    "exit_demo": "Sair do modo demo"
   },
   "dashboard": {
-    "title": "Dashboard",
+    "title": "Visão geral",
+    "subtitle": "Status do agregador, clientes conectados e licenciamento.",
     "consultants_active": "Consultores ativos",
     "clients_online": "Clientes online",
     "tunnels_total": "Túneis configurados",
-    "license_status": "Status da licença"
+    "license_status": "Status da licença",
+    "internet_status": "Conectividade",
+    "internet_ok": "Aggregator alcançável",
+    "topology": "Mapa da rede",
+    "recent_audit": "Atividade recente"
   },
   "clients": {
     "title": "Clientes",
+    "subtitle": "Cada cliente é uma VPN remota que o agregador mantém conectada para os consultores.",
     "create": "Novo cliente",
     "id": "ID",
     "name": "Nome",
@@ -61,12 +75,13 @@
     "send_otp": "Enviar OTP",
     "logs": "Logs",
     "details": "Detalhes",
-    "config_text": "Configuração do túnel",
-    "username": "Usuário",
-    "password": "Senha",
+    "config_text": "Configuração do túnel (.ovpn / .conf / etc)",
+    "username": "Usuário (opcional)",
+    "password": "Senha (opcional)",
     "save": "Salvar cliente",
     "delete_confirm": "Tem certeza que deseja excluir este cliente?",
-    "no_clients": "Nenhum cliente cadastrado.",
+    "no_clients": "Nenhum cliente cadastrado. Clique em \"Novo cliente\" para começar.",
+    "form_intro": "Defina o protocolo e os intervalos de rede. O CIDR virtual é o endereço que os consultores enxergam; o CIDR real é o que existe na rede do cliente.",
     "states": {
       "stopped": "Parado",
       "starting": "Iniciando",
@@ -76,43 +91,69 @@
     }
   },
   "consultants": {
-    "title": "Consultores",
-    "create": "Novo consultor",
+    "title": "Usuários",
+    "subtitle": "Pessoas autorizadas a se conectar pelo VAGG Client e acessar as VPNs dos clientes.",
+    "create": "Novo usuário",
+    "create_subtitle": "O usuário entra no VAGG Client (Windows) com o login e senha definidos aqui.",
+    "edit_subtitle": "Atualize os dados do usuário. Para trocar a senha, preencha o campo Senha.",
+    "password_hint_edit": "deixe vazio para manter a senha atual",
     "email": "E-mail",
-    "name": "Nome",
-    "openvpn_username": "Usuário OpenVPN",
-    "static_pool_ip": "IP estático",
+    "name": "Login",
+    "password": "Senha",
+    "password_set": "Definida",
+    "password_missing": "Sem senha",
+    "password_hint": "deixe vazio se quiser definir depois",
+    "set_password": "Redefinir senha",
+    "set_password_subtitle": "A próxima entrada do usuário no VAGG Client usará esta senha.",
+    "new_password": "Nova senha",
+    "openvpn_username": "Login (alternativo)",
+    "static_pool_ip": "IP estático no pool",
     "role": "Papel",
     "active": "Ativo",
-    "delete_confirm": "Tem certeza que deseja excluir este consultor?",
-    "no_consultants": "Nenhum consultor cadastrado."
+    "delete_confirm": "Tem certeza que deseja excluir este usuário?",
+    "no_consultants": "Nenhum usuário cadastrado.",
+    "roles": {
+      "admin": "Administrador",
+      "operator": "Operador",
+      "viewer": "Somente leitura"
+    }
   },
   "policies": {
-    "title": "Políticas (consultor × cliente)",
+    "title": "Políticas",
+    "subtitle": "Quem pode acessar o quê. Cada linha autoriza um usuário a alcançar a rede de um cliente.",
     "create": "Nova política",
-    "consultant": "Consultor",
+    "consultant": "Usuário",
     "client": "Cliente",
     "scope_kind": "Tipo de escopo",
     "scope_value": "Valor do escopo",
     "expires_at": "Expira em",
-    "no_policies": "Nenhuma política cadastrada."
+    "no_policies": "Nenhuma política cadastrada.",
+    "scope_kinds": {
+      "full": "Acesso total",
+      "subnet": "Sub-rede",
+      "host": "Host único"
+    }
   },
   "audit": {
     "title": "Auditoria",
+    "subtitle": "Cadeia hash-chained de eventos. Compatível com LGPD/SOC2.",
     "event_type": "Tipo de evento",
     "actor": "Ator",
     "occurred_at": "Quando",
     "payload": "Detalhes",
-    "filter_event_type": "Filtrar por tipo",
-    "filter_consultant": "Filtrar por consultor",
+    "filter_event_type": "Filtrar por tipo (ex: tunnel.)",
+    "filter_consultant": "Filtrar por usuário",
     "no_events": "Nenhum evento."
   },
   "system": {
     "title": "Sistema",
+    "subtitle": "Status do agregador, versão e operações de manutenção.",
     "version": "Versão",
     "license": "Licença",
     "health": "Saúde",
     "regenerate_dns": "Regenerar Corefile DNS",
-    "regenerated": "Corefile regenerado e CoreDNS recarregado."
+    "regenerated": "Corefile regenerado e CoreDNS recarregado.",
+    "uptime": "Operacional",
+    "endpoint": "Endpoint da API"
   }
 }

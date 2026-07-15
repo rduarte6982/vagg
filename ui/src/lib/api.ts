@@ -80,9 +80,58 @@ function makeClient(): AxiosInstance {
     timeout: 30_000,
   });
   inst.interceptors.request.use(attachAuth);
+
+  // Auto-refresh em 401: tenta refresh_token uma vez, retry a request original.
+  // Sem isso, todo background polling morre após o JWT expirar (~15min).
+  let refreshing: Promise<string | null> | null = null;
+  async function refreshNow(): Promise<string | null> {
+    const rt = getRefreshToken();
+    if (!rt) return null;
+    try {
+      const resp = await axios.post(
+        '/api/v1/auth/refresh',
+        { refresh_token: rt },
+        { headers: { 'Content-Type': 'application/json' }, timeout: 15_000 },
+      );
+      const newAccess = resp.data?.access_token as string | undefined;
+      if (newAccess) {
+        setTokens(newAccess, rt);
+        return newAccess;
+      }
+    } catch {
+      /* fall through */
+    }
+    return null;
+  }
+
   inst.interceptors.response.use(
     (resp) => resp,
-    (err: AxiosError) => unwrapError(err),
+    async (err: AxiosError) => {
+      // 401 + tem refresh + ainda não retentou → refresh + retry
+      const cfg = err.config as InternalAxiosRequestConfig & { _vagg_retried?: boolean };
+      if (
+        err.response?.status === 401 &&
+        cfg &&
+        !cfg._vagg_retried &&
+        getRefreshToken()
+      ) {
+        cfg._vagg_retried = true;
+        refreshing = refreshing ?? refreshNow();
+        const newTok = await refreshing;
+        refreshing = null;
+        if (newTok) {
+          cfg.headers?.set?.('Authorization', `Bearer ${newTok}`);
+          try {
+            return await inst.request(cfg);
+          } catch (retryErr) {
+            return unwrapError(retryErr as AxiosError);
+          }
+        }
+        // refresh falhou — limpa estado pra forçar re-login
+        clearTokens();
+      }
+      return unwrapError(err);
+    },
   );
   return inst;
 }
@@ -130,6 +179,7 @@ export interface Client {
   requires_otp?: boolean;
   auth_method?: 'none' | 'otp' | 'saml';
   has_saml_cookie?: boolean;
+  has_totp_secret?: boolean;
   has_config?: boolean;
   has_credentials?: boolean;
   saml_cookie_expires_at?: string | null;
@@ -400,6 +450,111 @@ export const Saml = {
       });
     }
     return (await api.get(`/clients/${clientId}/saml/seen-cookies`)).data;
+  },
+
+  // ----- SAML-LOGIN MODE (openfortivpn --saml-login=PORT) -----
+  // Caminho NOVO pra FortiGate Vexia/hostcheck. User loga no browser
+  // dele, o gateway redireciona pra http://127.0.0.1:PORT/?id=X, frontend
+  // captura URL e posta `id` aqui → openfortivpn pega cookie na mesma
+  // TLS session (sem invalidação por pinning).
+  startLogin: async (
+    clientId: string,
+  ): Promise<{
+    client_id: string;
+    vpn_type: string;
+    start_url: string;
+    port: number;
+    expected_callback_prefix: string;
+    container_id: string | null;
+    portal_url?: string | null;
+    gateway_host: string;
+  }> => {
+    if (isDemo()) {
+      return demoDelay({
+        client_id: clientId,
+        vpn_type: 'openfortivpn',
+        start_url: 'about:blank',
+        port: 8020,
+        expected_callback_prefix: 'http://127.0.0.1:8020/?id=',
+        container_id: 'demo-saml-login',
+        portal_url: null,
+        gateway_host: 'demo.example.com',
+      });
+    }
+    return (
+      await api.post(`/clients/${clientId}/saml-login/start`, undefined, {
+        timeout: 60_000,
+      })
+    ).data;
+  },
+  relayLogin: async (
+    clientId: string,
+    samlId: string,
+  ): Promise<{ client_id: string; relayed: boolean; status_code: number }> => {
+    if (isDemo()) {
+      return demoDelay({ client_id: clientId, relayed: true, status_code: 200 });
+    }
+    return (
+      await api.post(
+        `/clients/${clientId}/saml-login/relay`,
+        { saml_id: samlId },
+        { timeout: 30_000 },
+      )
+    ).data;
+  },
+};
+
+// ----- TOTP / Auto-OTP (seed RFC 6238 cifrado at-rest) -----
+
+export interface TotpInfo {
+  has_secret: boolean;
+  issuer?: string | null;
+  account?: string | null;
+  digits?: number;
+  period?: number;
+  algorithm?: string;
+  seconds_remaining?: number | null;
+}
+
+export interface TotpPreview {
+  code: string;
+  seconds_remaining: number;
+  period: number;
+}
+
+export const Totp = {
+  get: async (clientId: string): Promise<TotpInfo> => {
+    if (isDemo()) return demoDelay({ has_secret: false });
+    return (await api.get(`/clients/${clientId}/totp`)).data;
+  },
+  set: async (clientId: string, secret: string): Promise<TotpInfo> => {
+    if (isDemo()) {
+      return demoDelay({
+        has_secret: true,
+        digits: 6,
+        period: 30,
+        algorithm: 'sha1',
+        seconds_remaining: 30,
+      });
+    }
+    return (await api.put(`/clients/${clientId}/totp`, { secret })).data;
+  },
+  remove: async (clientId: string): Promise<void> => {
+    if (isDemo()) {
+      await demoDelay(undefined);
+      return;
+    }
+    await api.delete(`/clients/${clientId}/totp`);
+  },
+  preview: async (clientId: string): Promise<TotpPreview> => {
+    if (isDemo()) {
+      return demoDelay({
+        code: '123456',
+        seconds_remaining: 17,
+        period: 30,
+      });
+    }
+    return (await api.post(`/clients/${clientId}/totp/preview`)).data;
   },
 };
 

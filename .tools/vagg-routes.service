@@ -1,0 +1,12 @@
+[Unit]
+Description=vagg-aggregator: reconcilia rotas/NAT/FORWARD pra todos os tuneis ativos
+After=vagg-stack.service docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/vagg-routes-reconcile.sh
+TimeoutStartSec=120
+
+[Install]
+WantedBy=multi-user.target

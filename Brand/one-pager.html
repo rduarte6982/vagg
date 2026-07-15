@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8"/>
+<title>VAGG · One-pager</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap"/>
+<link rel="stylesheet" href="brand.css"/>
+<style>
+  body { background: #2a2c30; padding: 40px 0; }
+  .page {
+    width: 794px; min-height: 1123px;
+    margin: 0 auto;
+    background: var(--paper); color: var(--ink-on-paper);
+    padding: 56px 64px;
+    box-shadow: 0 30px 80px rgba(0,0,0,.4);
+    font-family: var(--font-sans);
+    position: relative;
+  }
+  .head { display: flex; justify-content: space-between; align-items: center; padding-bottom: 18px; border-bottom: 1px solid #c9c7be; margin-bottom: 32px; }
+  .head .brand { display: flex; align-items: center; gap: 10px; }
+  .head .brand .vagg-wordmark { color: var(--ink-on-paper); font-size: 20px; }
+  .head .meta { font-family: var(--font-mono); font-size: 11px; color: #6b7280; letter-spacing: .14em; text-transform: uppercase; text-align: right; }
+  h1 { font-family: var(--font-mono); font-weight: 600; font-size: 44px; line-height: 1.05; letter-spacing: -.02em; margin: 0 0 14px; text-wrap: balance; }
+  h1 .ac { color: oklch(48% 0.12 162); }
+  .lead { font-size: 16px; line-height: 1.5; color: #2c333b; max-width: 600px; }
+  h3 { font-family: var(--font-mono); font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: #6b7280; margin: 36px 0 14px; }
+  .grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+  .card { padding: 16px; background: white; border: 1px solid #d8d6cc; border-radius: 10px; }
+  .card .num { font-family: var(--font-mono); font-size: 22px; font-weight: 600; }
+  .card .lb { font-size: 12px; color: #4b5563; margin-top: 6px; line-height: 1.4; }
+  table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 12px; }
+  table th { font-family: var(--font-mono); font-size: 10px; letter-spacing: .14em; text-transform: uppercase; color: #6b7280; text-align: left; padding: 10px 8px; border-bottom: 1px solid #c9c7be; }
+  table td { padding: 10px 8px; border-bottom: 1px dashed #d8d6cc; vertical-align: top; }
+  table td.feat { font-weight: 500; }
+  table td.tick { text-align: center; color: oklch(48% 0.12 162); font-family: var(--font-mono); }
+  table td.x    { text-align: center; color: #b6bbc2; font-family: var(--font-mono); }
+  .priceblock { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+  .pp { padding: 16px; background: white; border: 1px solid #d8d6cc; border-radius: 10px; }
+  .pp.fea { border-color: oklch(48% 0.12 162); border-width: 2px; }
+  .pp .tier { font-family: var(--font-mono); font-size: 10px; letter-spacing: .14em; text-transform: uppercase; color: #6b7280; }
+  .pp.fea .tier { color: oklch(48% 0.12 162); }
+  .pp .amt { font-family: var(--font-mono); font-size: 22px; font-weight: 600; margin: 6px 0 2px; }
+  .pp .per { font-family: var(--font-mono); font-size: 10px; color: #6b7280; }
+  .foot {
+    position: absolute; left: 64px; right: 64px; bottom: 40px;
+    padding-top: 14px; border-top: 1px solid #c9c7be;
+    display: flex; justify-content: space-between;
+    font-family: var(--font-mono); font-size: 10px; color: #6b7280; letter-spacing: .1em; text-transform: uppercase;
+  }
+  .quote {
+    border-left: 3px solid oklch(48% 0.12 162);
+    padding: 8px 16px;
+    margin: 18px 0;
+    font-size: 14px; color: #2c333b; font-style: italic;
+  }
+  .stack { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="head">
+    <div class="brand">
+      <svg viewBox="0 0 28 28" class="vagg-mark on-paper"><circle class="node" cx="4" cy="4" r="2"/><circle class="node" cx="24" cy="4" r="2"/><circle class="node" cx="4" cy="24" r="2"/><circle class="node" cx="24" cy="24" r="2"/><path class="wire" d="M4 4 L14 14"/><path class="wire" d="M24 4 L14 14"/><path class="wire" d="M4 24 L14 14"/><path class="wire" d="M24 24 L14 14"/><rect class="core" x="10" y="10" width="8" height="8" rx="1.6"/></svg>
+      <span class="vagg-wordmark">vagg<span class="dot" style="color:oklch(48% 0.12 162)">.</span></span>
+    </div>
+    <div class="meta">one-pager · v1.2 · maio 2026<br/>vendas@vagg.io · vagg.io</div>
+  </div>
+
+  <h1>Uma VPN. <span class="ac">Todos</span><br/>os clientes da sua consultoria.</h1>
+  <p class="lead">VAGG é o agregador de túneis VPN para consultorias B2B que vivem entre a rede de cinco clientes ao mesmo tempo. Self-hosted, atrás da OpenVPN que você já tem.</p>
+
+  <h3>o problema</h3>
+  <div class="grid3">
+    <div class="card"><div class="num">R$ 30k/mês</div><div class="lb">Tempo perdido entre VPNs · 30 consultores × 20min/dia</div></div>
+    <div class="card"><div class="num">R$ 10k/mês</div><div class="lb">Tickets de IT por cliente VPN alheio</div></div>
+    <div class="card"><div class="num">Risco LGPD</div><div class="lb">Sem audit trail centralizado</div></div>
+  </div>
+
+  <div class="stack">
+    <div>
+      <h3>como funciona</h3>
+      <p class="lead" style="font-size:13px">1. Consultor conecta na OpenVPN da empresa · 2. VAGG identifica via RADIUS e aplica RBAC · 3. DNS amigável aparece, NAT atômico cuida de IPs sobrepostos · 4. Cada acesso vira audit event assinado.</p>
+    </div>
+    <div>
+      <h3>diferencial irresistível</h3>
+      <p class="lead" style="font-size:13px">Portal de Transparência read-only para o cliente final. Auditor da Petrobras pergunta — você dá um link. Cryptographically signed. Switching cost que vira renovação.</p>
+    </div>
+  </div>
+
+  <h3>matriz de planos</h3>
+  <div class="priceblock">
+    <div class="pp"><div class="tier">Starter</div><div class="amt">R$ 1.490/mês</div><div class="per">até 5 clientes finais</div></div>
+    <div class="pp fea"><div class="tier">Professional</div><div class="amt">R$ 3.990/mês</div><div class="per">até 20 clientes · portal</div></div>
+    <div class="pp"><div class="tier">Enterprise</div><div class="amt">sob consulta</div><div class="per">+50 clientes · appliance</div></div>
+  </div>
+
+  <table>
+    <thead><tr><th>Capacidade</th><th>Starter</th><th>Professional</th><th>Enterprise</th></tr></thead>
+    <tbody>
+      <tr><td class="feat">Aggregator self-hosted</td><td class="tick">✓</td><td class="tick">✓</td><td class="tick">✓</td></tr>
+      <tr><td class="feat">RBAC + RADIUS/LDAP</td><td class="tick">✓</td><td class="tick">✓</td><td class="tick">✓</td></tr>
+      <tr><td class="feat">Portal de Transparência</td><td class="x">—</td><td class="tick">✓</td><td class="tick">✓</td></tr>
+      <tr><td class="feat">SIEM shipping · Vector</td><td class="x">—</td><td class="tick">✓</td><td class="tick">✓</td></tr>
+      <tr><td class="feat">Multi-instance HA</td><td class="x">—</td><td class="x">—</td><td class="tick">✓</td></tr>
+      <tr><td class="feat">SLA</td><td>best-effort</td><td>4h · 8×5</td><td>1h · 24×7</td></tr>
+    </tbody>
+  </table>
+
+  <div class="quote">"Trial de 14 dias. Setup em 40 minutos com seu time de IT. Sem cartão de crédito."</div>
+
+  <div class="foot">
+    <span>vagg networks ltda · cnpj 60.412.881/0001-22</span>
+    <span>são paulo · brasil · apache 2.0</span>
+  </div>
+</div>
+</body>
+</html>
