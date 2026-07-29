@@ -13,7 +13,7 @@ VPNs do consultor sempre atualizadas no Windows.
 │  ┌────────────────────────────────────────────┐                 │
 │  │ VAGG Client                              ─x│                 │
 │  │ ─────────────────────────                  │                 │
-│  │ ● Conectado ao servidor (192.168.68.102)   │                 │
+│  │ ● Conectado ao servidor (192.168.68.103)   │                 │
 │  │   há 3min42s                               │                 │
 │  │                                            │                 │
 │  │ Clientes liberados:                        │                 │

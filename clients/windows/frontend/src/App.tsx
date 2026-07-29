@@ -185,7 +185,7 @@ export default function App() {
               <input
                 value={serverUrl}
                 onChange={(e) => setServerUrl(e.target.value)}
-                placeholder="http://192.168.68.102"
+                placeholder="http://192.168.68.103:8443"
                 className="w-full rounded-md border border-vagg-line-2 bg-vagg-bg-3 px-3 py-2 text-sm text-vagg-ink placeholder:text-vagg-ink-4 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
               />
             </div>
