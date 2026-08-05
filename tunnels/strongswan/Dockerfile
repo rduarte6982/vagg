@@ -19,7 +19,10 @@ RUN mkdir -p /etc/swanctl /var/run/vagg /run
 COPY --chmod=0755 shared/tunnel_controller.py    /usr/local/bin/tunnel-controller
 COPY --chmod=0755 strongswan/entrypoint.sh       /usr/local/bin/entrypoint
 
-ENV TUNNEL_CONFIG_PATH=/config/swanctl.conf \
+# TUNNEL_CONFIG_PATH tem de bater com o que o orchestrator grava
+# (_stage_config escreve sempre /config/tunnel.conf, igual aos demais tunnels).
+# O entrypoint faz o symlink p/ /etc/swanctl/swanctl.conf.
+ENV TUNNEL_CONFIG_PATH=/config/tunnel.conf \
     TUNNEL_OTP_PIPE=/run/otp.pipe \
     TUNNEL_CONTROL_SOCKET=/var/run/vagg/control.sock \
     TUNNEL_MANAGER=strongswan \

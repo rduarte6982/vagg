@@ -22,7 +22,11 @@ mkdir -p "$(dirname "$TUNNEL_CONTROL_SOCKET")"
 ln -sf "$TUNNEL_CONFIG_PATH" /etc/swanctl/swanctl.conf
 
 log "starting charon"
-charon &
+# charon não fica no PATH no pacote strongswan do Alpine — fica em
+# /usr/lib/strongswan/charon. Chamar "charon" puro falhava silenciosamente
+# (job em background não dispara set -e) e o túnel nunca subia.
+CHARON_BIN="$(command -v charon || echo /usr/lib/strongswan/charon)"
+"$CHARON_BIN" &
 charon_pid=$!
 
 trap 'kill -TERM "$charon_pid" 2>/dev/null || true; exit 0' TERM INT

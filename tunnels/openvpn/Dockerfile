@@ -34,5 +34,9 @@ ENV TUNNEL_CONFIG_PATH=/config/tunnel.conf \
     TUNNEL_LOG_LEVEL=INFO
 
 VOLUME ["/config", "/var/run/vagg"]
-USER vagg
+# NÃO rodar como usuário não-root: o entrypoint escreve em /run
+# (tunnel-iface-snapshot.json, socket de mgmt do openvpn) e lê /config, que o
+# orchestrator monta 0700/uid-do-core. Um uid não-root não consegue nem
+# atravessar /config nem escrever em /run → container em CrashLoop. Os demais
+# tunnels (openfortivpn/strongswan) rodam como root pelo mesmo motivo.
 ENTRYPOINT ["/usr/local/bin/entrypoint"]
